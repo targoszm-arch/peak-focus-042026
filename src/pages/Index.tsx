@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useSEO } from "@/hooks/use-seo";
 import { Flame, Timer, ListTodo, Mountain } from "lucide-react";
+import { MountainVisualization } from "@/components/ui/MountainVisualization";
 import { Link } from "react-router-dom";
 
 const Index = () => {
@@ -20,20 +21,8 @@ const Index = () => {
         </span>
       </header>
 
-      <section aria-label="Mountain progress" className="relative rounded-xl border bg-card p-6 text-card-foreground shadow-sm overflow-hidden">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-b from-[hsl(var(--primary))] to-[hsl(var(--primary)/0.6)] opacity-70" />
-        <div className="relative flex items-center justify-between text-white">
-          <svg width="64" height="64" viewBox="0 0 64 64" className="h-16 w-16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-            <path d="M32 2L12 52H52L32 2Z" stroke="white" strokeWidth="2" fill="url(#mountain-gradient)" />
-            <defs>
-              <linearGradient id="mountain-gradient" x1="32" y1="2" x2="32" y2="52" gradientUnits="userSpaceOnUse">
-                <stop stopColor="hsl(var(--primary))" />
-                <stop offset="1" stopColor="hsl(var(--primary)/0.6)" />
-              </linearGradient>
-            </defs>
-          </svg>
-          <span className="text-2xl font-bold" aria-live="polite" aria-atomic="true">65% to summit</span>
-        </div>
+      <section aria-label="Mountain progress">
+        <MountainVisualization completionPercentage={65} theme="alpine" />
       </section>
 
       <section aria-label="Focus statistics" className="grid grid-cols-2 gap-4">
