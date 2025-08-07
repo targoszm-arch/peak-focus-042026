@@ -2,6 +2,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button";
 import { Mountain } from "lucide-react";
 import { useSEO } from "@/hooks/use-seo";
+import { Link } from "react-router-dom";
 
 const Index = () => {
   useSEO({
@@ -26,7 +27,9 @@ const Index = () => {
             <p className="text-sm text-muted-foreground text-center">Clean, calm UI inspired by Peak Focus. Start a session and stay in flow.</p>
           </CardContent>
           <CardFooter className="flex justify-center">
-            <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">Get Started</Button>
+            <Button asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+              <Link to="/focus" aria-label="Start focusing now">Get Started</Link>
+            </Button>
           </CardFooter>
         </Card>
       </article>
