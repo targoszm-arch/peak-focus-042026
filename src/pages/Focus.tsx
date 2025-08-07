@@ -127,6 +127,9 @@ const Focus = () => {
                 Home
               </Link>
             </Button>
+            <Button asChild>
+              <Link to="/focus/timer-settings">Timer Settings</Link>
+            </Button>
           </CardFooter>
 
         </Card>
