@@ -17,6 +17,11 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
+    /* Brand and accent tokens to match Peak Focus styling */
+    --brand: 245 82% 61%; /* Indigo 600 */
+    --brand-foreground: 0 0% 100%;
+
+    /* App primary remains dark for strong CTA contrast */
     --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
 
@@ -34,9 +39,13 @@ All colors MUST be HSL.
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 245 82% 61%; /* Indigo focus ring */
 
     --radius: 0.5rem;
+
+    /* Background gradient tokens (light) */
+    --bg-gradient-from: 210 100% 97%; /* blue-50 */
+    --bg-gradient-to: 236 100% 96%;   /* indigo-100 */
 
     --sidebar-background: 0 0% 98%;
 
