@@ -16,7 +16,8 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route element={<AppLayout />}> 
-            <Route index element={<Navigate to="/focus" replace />} />
+            <Route index element={<P.Index />} />
+            <Route path="home" element={<P.Index />} />
 
             <Route path="focus">
               <Route index element={<P.Focus />} />
