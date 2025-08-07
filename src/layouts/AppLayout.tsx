@@ -20,11 +20,11 @@ function NavIconLink({ to, label, end, children }: { to: string; label: string; 
 export default function AppLayout() {
   return (
     <>
-      <div className="pb-16">
+      <div className="pb-20">
         <Outlet />
       </div>
 
-      <nav className="fixed bottom-0 left-0 right-0 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <nav className="fixed bottom-0 left-0 right-0 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
         <div className="mx-auto flex h-14 max-w-md items-center justify-around">
           <NavIconLink to="/" label="Home" end>
             <Home className="h-5 w-5" />

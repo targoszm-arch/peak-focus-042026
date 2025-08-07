@@ -69,7 +69,7 @@ const Focus = () => {
   const percent = ((total - secondsLeft) / total) * 100;
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[hsl(var(--bg-gradient-from))] to-[hsl(var(--bg-gradient-to))] flex items-center justify-center p-4">
+    <main className="min-h-screen bg-gradient-to-br from-[hsl(var(--bg-gradient-from))] to-[hsl(var(--bg-gradient-to))] flex items-center justify-center p-4 pb-20">
       <article className="w-full max-w-md">
         <Card>
           <CardHeader className="text-center">
