@@ -39,6 +39,8 @@ const App = () => (
               <Route path=":period" element={<P.ProgressPeriod />} />
             </Route>
 
+            <Route path="tasks" element={<P.Tasks />} />
+
             <Route path="settings">
               <Route index element={<P.Settings />} />
               <Route path="notifications" element={<P.SettingsNotifications />} />

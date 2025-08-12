@@ -45,7 +45,7 @@ const Index = () => {
         </Button>
 
         <Link
-          to="/mountains"
+          to="/tasks"
           className="inline-flex w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
           aria-label="Manage Tasks"
         >
