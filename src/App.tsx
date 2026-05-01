@@ -40,6 +40,7 @@ const App = () => (
             </Route>
 
             <Route path="tasks" element={<P.Tasks />} />
+            <Route path="habits" element={<P.Habits />} />
 
             <Route path="settings">
               <Route index element={<P.Settings />} />
