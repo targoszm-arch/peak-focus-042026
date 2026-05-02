@@ -3,30 +3,30 @@ import React, { useMemo } from 'react';
 interface MountainVisualizationProps {
   completionPercentage: number;
   theme?: 'alpine' | 'desert' | 'volcanic' | 'coastal' | 'forest';
+  mode?: 'shrink' | 'grow';
+  label?: string;
 }
 
-export const MountainVisualization = ({ 
-  completionPercentage = 0, 
-  theme = 'alpine' 
+export const MountainVisualization = ({
+  completionPercentage = 0,
+  theme = 'alpine',
+  mode = 'shrink',
+  label = 'Complete',
 }: MountainVisualizationProps) => {
-  console.log('[MOUNTAIN] Rendering with completion:', completionPercentage, 'theme:', theme);
-  
   // Ensure percentage is between 0 and 100
   const safePercentage = Math.max(0, Math.min(100, completionPercentage));
-  
+  // In "grow" mode, the mountain starts hidden and grows as score increases.
+  // We invert the visibility level so existing transforms work the same way.
+  const visibility = mode === 'grow' ? 100 - safePercentage : safePercentage;
+
   const mountainTranslateY = useMemo(() => {
-    // Gradual mountain reduction - more linear progression
-    // At 0% completion: translateY = 0 (fully visible)
-    // At 100% completion: translateY = 180px (mostly hidden, peaks still visible)
-    return (safePercentage / 100) * 180;
-  }, [safePercentage]);
+    return (visibility / 100) * 180;
+  }, [visibility]);
 
   const mountainOpacity = useMemo(() => {
-    // Mountain becomes more transparent as tasks are completed
-    // Start fading after 50% completion
-    if (safePercentage < 50) return 1;
-    return Math.max(0.3, 1 - ((safePercentage - 50) / 50) * 0.7);
-  }, [safePercentage]);
+    if (visibility < 50) return 1;
+    return Math.max(0.3, 1 - ((visibility - 50) / 50) * 0.7);
+  }, [visibility]);
 
   const northernLightsOpacity = useMemo(() => {
     // Northern lights appear gradually after 60% completion
@@ -234,7 +234,7 @@ export const MountainVisualization = ({
             }}
           />
           <span className="font-semibold">{Math.round(safePercentage)}%</span>
-          <span className="text-xs text-slate-600">Complete</span>
+          <span className="text-xs text-slate-600">{label}</span>
         </div>
       </div>
     </div>
