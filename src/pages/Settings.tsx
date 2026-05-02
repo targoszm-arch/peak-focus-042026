@@ -8,7 +8,7 @@ import { Activity, LogOut, Mail } from "lucide-react";
 
 const OURA_CLIENT_ID = "7e27aab7-c93f-4acd-bb9b-cf083c82b33a";
 const OURA_REDIRECT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oura-callback`;
-const OURA_SCOPE = "personal daily heartrate workout session";
+const OURA_SCOPE = "email personal daily heartrate tag workout session spo2 ring_configuration stress heart_health";
 
 export default function Settings() {
   useSEO({

@@ -57,6 +57,7 @@ const App = () => (
                 </Route>
 
                 <Route path="tasks" element={<P.Tasks />} />
+                <Route path="health" element={<P.Health />} />
                 <Route path="habits" element={<P.Habits />} />
 
                 <Route path="settings">

@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useSEO } from "@/hooks/use-seo";
-import { useTasks, type Task, type TimeOfDay } from "@/hooks/use-tasks";
+import { useTasks, INBOX_ID, type Task, type TimeOfDay } from "@/hooks/use-tasks";
+import { Link } from "react-router-dom";
+import { FolderKanban, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sun,
@@ -111,7 +113,17 @@ export default function Progress() {
     canonical: "/progress",
   });
 
-  const { tasks, toggleTask, removeTask } = useTasks();
+  const { tasks, projects, toggleTask, removeTask } = useTasks();
+  const [projectsOpen, setProjectsOpen] = useState(false);
+
+  const projectGroups = useMemo(() => {
+    const inbox = tasks.filter((t) => !t.completed && t.projectId === INBOX_ID);
+    const groups = projects.map((p) => ({
+      project: p,
+      items: tasks.filter((t) => !t.completed && t.projectId === p.id),
+    }));
+    return { inbox, groups };
+  }, [tasks, projects]);
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [openSections, setOpenSections] = useState<Record<Bucket, boolean>>({
     anytime: true,
@@ -196,6 +208,67 @@ export default function Progress() {
             </button>
           </div>
         </header>
+
+        <section className="rounded-xl border bg-card">
+          <button
+            type="button"
+            onClick={() => setProjectsOpen((o) => !o)}
+            aria-expanded={projectsOpen}
+            className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium"
+          >
+            <span className="flex items-center gap-2">
+              <FolderKanban className="h-4 w-4 text-muted-foreground" />
+              Projects
+              <span className="text-xs text-muted-foreground">
+                ({projects.length} · {projectGroups.inbox.length + projectGroups.groups.reduce((n, g) => n + g.items.length, 0)} open)
+              </span>
+            </span>
+            <ChevronDown
+              className={
+                "h-4 w-4 text-muted-foreground transition-transform " +
+                (projectsOpen ? "" : "-rotate-90")
+              }
+            />
+          </button>
+          {projectsOpen && (
+            <div className="space-y-3 border-t px-3 py-3">
+              <Link
+                to="/tasks"
+                className="flex items-center justify-between rounded-md bg-muted/40 p-2 text-xs hover:bg-muted"
+              >
+                <span className="flex items-center gap-2">
+                  <Inbox className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="font-medium">Inbox</span>
+                </span>
+                <span className="text-muted-foreground">
+                  {projectGroups.inbox.length} open
+                </span>
+              </Link>
+              {projectGroups.groups.map(({ project, items }) => (
+                <Link
+                  key={project.id}
+                  to="/tasks"
+                  className="flex items-center justify-between rounded-md bg-muted/40 p-2 text-xs hover:bg-muted"
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: project.color }}
+                    />
+                    <span className="font-medium">{project.name}</span>
+                  </span>
+                  <span className="text-muted-foreground">{items.length} open</span>
+                </Link>
+              ))}
+              <Link
+                to="/tasks"
+                className="block text-center text-xs font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Manage projects →
+              </Link>
+            </div>
+          )}
+        </section>
 
         <section
           className="grid grid-cols-7 gap-1 text-center"
