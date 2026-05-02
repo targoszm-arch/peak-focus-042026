@@ -5,52 +5,103 @@ export type Task = {
   title: string;
   completed: boolean;
   createdAt: number;
+  projectId: string; // "inbox" or a project id
 };
 
-const STORAGE_KEY = "pf.tasks";
+export type Project = {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: number;
+};
 
-function readFromStorage(): Task[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    if (Array.isArray(data)) return data as Task[];
-  } catch (e) {
-    // ignore
-  }
-  return [];
+export const INBOX_ID = "inbox";
+
+const TASKS_KEY = "pf.tasks";
+const PROJECTS_KEY = "pf.projects.v1";
+
+const PROJECT_COLORS = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#ec4899",
+  "#14b8a6",
+];
+
+function pickColor(existing: Project[]): string {
+  return PROJECT_COLORS[existing.length % PROJECT_COLORS.length];
 }
 
-function writeToStorage(tasks: Task[]) {
+function genId(): string {
+  return (globalThis as any)?.crypto?.randomUUID
+    ? (globalThis as any).crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function readJSON<T>(key: string, fallback: T): T {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-  } catch (e) {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const data = JSON.parse(raw);
+    return data ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJSON(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
     // ignore
   }
+}
+
+function migrateTasks(raw: any[]): Task[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((t) => ({
+    id: String(t.id ?? genId()),
+    title: String(t.title ?? ""),
+    completed: !!t.completed,
+    createdAt: Number(t.createdAt ?? Date.now()),
+    projectId: typeof t.projectId === "string" && t.projectId ? t.projectId : INBOX_ID,
+  }));
 }
 
 export function useTasks() {
+  const [hydrated, setHydrated] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
-    setTasks(readFromStorage());
+    setTasks(migrateTasks(readJSON<any[]>(TASKS_KEY, [])));
+    setProjects(readJSON<Project[]>(PROJECTS_KEY, []));
+    setHydrated(true);
   }, []);
 
   useEffect(() => {
-    writeToStorage(tasks);
-  }, [tasks]);
+    if (hydrated) writeJSON(TASKS_KEY, tasks);
+  }, [tasks, hydrated]);
 
-  const addTask = useCallback((title: string) => {
+  useEffect(() => {
+    if (hydrated) writeJSON(PROJECTS_KEY, projects);
+  }, [projects, hydrated]);
+
+  const addTask = useCallback((title: string, projectId: string = INBOX_ID) => {
     const t = title.trim();
     if (!t) return;
-    const id = (globalThis as any)?.crypto?.randomUUID
-      ? (globalThis as any).crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setTasks((prev) => [{ id, title: t, completed: false, createdAt: Date.now() }, ...prev]);
+    setTasks((prev) => [
+      { id: genId(), title: t, completed: false, createdAt: Date.now(), projectId },
+      ...prev,
+    ]);
   }, []);
 
   const toggleTask = useCallback((id: string) => {
-    setTasks((prev) => prev.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task)));
+    setTasks((prev) =>
+      prev.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task))
+    );
   }, []);
 
   const removeTask = useCallback((id: string) => {
@@ -58,11 +109,43 @@ export function useTasks() {
   }, []);
 
   const updateTask = useCallback((id: string, title: string) => {
-    setTasks((prev) => prev.map((task) => (task.id === id ? { ...task, title: title.trim() } : task)));
+    setTasks((prev) =>
+      prev.map((task) => (task.id === id ? { ...task, title: title.trim() } : task))
+    );
   }, []);
 
-  const clearCompleted = useCallback(() => {
-    setTasks((prev) => prev.filter((t) => !t.completed));
+  const moveTask = useCallback((id: string, projectId: string) => {
+    setTasks((prev) =>
+      prev.map((task) => (task.id === id ? { ...task, projectId } : task))
+    );
+  }, []);
+
+  const clearCompleted = useCallback((projectId?: string) => {
+    setTasks((prev) =>
+      prev.filter((t) => !t.completed || (projectId && t.projectId !== projectId))
+    );
+  }, []);
+
+  const addProject = useCallback((name: string) => {
+    const n = name.trim();
+    if (!n) return;
+    setProjects((prev) => [
+      ...prev,
+      { id: genId(), name: n, color: pickColor(prev), createdAt: Date.now() },
+    ]);
+  }, []);
+
+  const renameProject = useCallback((id: string, name: string) => {
+    const n = name.trim();
+    if (!n) return;
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name: n } : p)));
+  }, []);
+
+  const removeProject = useCallback((id: string) => {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+    setTasks((prev) =>
+      prev.map((t) => (t.projectId === id ? { ...t, projectId: INBOX_ID } : t))
+    );
   }, []);
 
   const stats = useMemo(
@@ -74,5 +157,36 @@ export function useTasks() {
     [tasks]
   );
 
-  return { tasks, addTask, toggleTask, removeTask, updateTask, clearCompleted, stats };
+  const projectStats = useMemo(() => {
+    const map: Record<string, { total: number; completed: number; remaining: number }> = {};
+    const ensure = (id: string) => {
+      if (!map[id]) map[id] = { total: 0, completed: 0, remaining: 0 };
+      return map[id];
+    };
+    ensure(INBOX_ID);
+    for (const p of projects) ensure(p.id);
+    for (const t of tasks) {
+      const s = ensure(t.projectId);
+      s.total += 1;
+      if (t.completed) s.completed += 1;
+      else s.remaining += 1;
+    }
+    return map;
+  }, [tasks, projects]);
+
+  return {
+    tasks,
+    projects,
+    addTask,
+    toggleTask,
+    removeTask,
+    updateTask,
+    moveTask,
+    clearCompleted,
+    addProject,
+    renameProject,
+    removeProject,
+    stats,
+    projectStats,
+  };
 }
