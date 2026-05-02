@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type Priority = "high" | "medium" | "low" | "none";
 
@@ -7,7 +9,7 @@ export type Task = {
   title: string;
   completed: boolean;
   createdAt: number;
-  projectId: string; // "inbox" or a project id
+  projectId: string; // INBOX_ID or a project id
   priority: Priority;
 };
 
@@ -19,9 +21,6 @@ export type Project = {
 };
 
 export const INBOX_ID = "inbox";
-
-const TASKS_KEY = "pf.tasks";
-const PROJECTS_KEY = "pf.projects.v1";
 
 const PROJECT_COLORS = [
   "#3b82f6",
@@ -37,143 +36,225 @@ function pickColor(existing: Project[]): string {
   return PROJECT_COLORS[existing.length % PROJECT_COLORS.length];
 }
 
-function genId(): string {
-  return (globalThis as any)?.crypto?.randomUUID
-    ? (globalThis as any).crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const TASKS_KEY = "pf.tasks";
+const PROJECTS_KEY = "pf.projects.v1";
+const MIGRATED_FLAG = "pf.migrated.v1";
+
+type DBTask = {
+  id: string;
+  title: string;
+  completed: boolean;
+  priority: Priority;
+  project_id: string | null;
+  created_at: string;
+};
+type DBProject = { id: string; name: string; color: string; created_at: string };
+
+function dbToTask(row: DBTask): Task {
+  return {
+    id: row.id,
+    title: row.title,
+    completed: row.completed,
+    createdAt: new Date(row.created_at).getTime(),
+    projectId: row.project_id ?? INBOX_ID,
+    priority: row.priority,
+  };
 }
 
-function readJSON<T>(key: string, fallback: T): T {
+function dbToProject(row: DBProject): Project {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    createdAt: new Date(row.created_at).getTime(),
+  };
+}
+
+async function migrateLocalStorageOnce(userId: string) {
+  if (localStorage.getItem(MIGRATED_FLAG)) return;
   try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const data = JSON.parse(raw);
-    return data ?? fallback;
-  } catch {
-    return fallback;
+    const localProjects = JSON.parse(localStorage.getItem(PROJECTS_KEY) || "[]");
+    const localTasks = JSON.parse(localStorage.getItem(TASKS_KEY) || "[]");
+    const idMap: Record<string, string> = {};
+
+    if (Array.isArray(localProjects) && localProjects.length) {
+      const rows = localProjects.map((p: any) => ({
+        user_id: userId,
+        name: p.name,
+        color: p.color ?? "#3b82f6",
+      }));
+      const { data, error } = await supabase
+        .from("projects")
+        .insert(rows)
+        .select("id, name");
+      if (!error && data) {
+        for (let i = 0; i < localProjects.length; i++) {
+          idMap[localProjects[i].id] = data[i]?.id ?? "";
+        }
+      }
+    }
+
+    if (Array.isArray(localTasks) && localTasks.length) {
+      const rows = localTasks.map((t: any) => ({
+        user_id: userId,
+        title: t.title,
+        completed: !!t.completed,
+        priority: ["high", "medium", "low", "none"].includes(t.priority)
+          ? t.priority
+          : "none",
+        project_id: idMap[t.projectId] ?? null,
+      }));
+      await supabase.from("tasks").insert(rows);
+    }
+  } catch (e) {
+    console.warn("[tasks] migration failed", e);
   }
-}
-
-function writeJSON(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
-}
-
-const PRIORITIES: Priority[] = ["high", "medium", "low", "none"];
-
-function normalizePriority(p: unknown): Priority {
-  return typeof p === "string" && (PRIORITIES as string[]).includes(p)
-    ? (p as Priority)
-    : "none";
-}
-
-function migrateTasks(raw: any[]): Task[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((t) => ({
-    id: String(t.id ?? genId()),
-    title: String(t.title ?? ""),
-    completed: !!t.completed,
-    createdAt: Number(t.createdAt ?? Date.now()),
-    projectId: typeof t.projectId === "string" && t.projectId ? t.projectId : INBOX_ID,
-    priority: normalizePriority(t.priority),
-  }));
+  localStorage.setItem(MIGRATED_FLAG, "1");
 }
 
 export function useTasks() {
-  const [hydrated, setHydrated] = useState(false);
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
 
-  useEffect(() => {
-    setTasks(migrateTasks(readJSON<any[]>(TASKS_KEY, [])));
-    setProjects(readJSON<Project[]>(PROJECTS_KEY, []));
-    setHydrated(true);
-  }, []);
+  const reload = useCallback(async () => {
+    if (!user) {
+      setTasks([]);
+      setProjects([]);
+      return;
+    }
+    const [{ data: t }, { data: p }] = await Promise.all([
+      supabase
+        .from("tasks")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("projects")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true }),
+    ]);
+    setTasks((t ?? []).map(dbToTask));
+    setProjects((p ?? []).map(dbToProject));
+  }, [user]);
 
   useEffect(() => {
-    if (hydrated) writeJSON(TASKS_KEY, tasks);
-  }, [tasks, hydrated]);
-
-  useEffect(() => {
-    if (hydrated) writeJSON(PROJECTS_KEY, projects);
-  }, [projects, hydrated]);
+    if (!user) return;
+    migrateLocalStorageOnce(user.id).then(reload);
+  }, [user, reload]);
 
   const addTask = useCallback(
-    (title: string, projectId: string = INBOX_ID, priority: Priority = "none") => {
+    async (title: string, projectId: string = INBOX_ID, priority: Priority = "none") => {
+      if (!user) return;
       const t = title.trim();
       if (!t) return;
-      setTasks((prev) => [
-        {
-          id: genId(),
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert({
+          user_id: user.id,
           title: t,
-          completed: false,
-          createdAt: Date.now(),
-          projectId,
           priority,
-        },
-        ...prev,
-      ]);
+          project_id: projectId === INBOX_ID ? null : projectId,
+        })
+        .select("*")
+        .single();
+      if (!error && data) {
+        setTasks((prev) => [dbToTask(data as DBTask), ...prev]);
+      }
     },
-    []
+    [user]
   );
 
-  const setTaskPriority = useCallback((id: string, priority: Priority) => {
+  const toggleTask = useCallback(
+    async (id: string) => {
+      const target = tasks.find((t) => t.id === id);
+      if (!target) return;
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+      );
+      await supabase
+        .from("tasks")
+        .update({ completed: !target.completed })
+        .eq("id", id);
+    },
+    [tasks]
+  );
+
+  const removeTask = useCallback(async (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    await supabase.from("tasks").delete().eq("id", id);
+  }, []);
+
+  const updateTask = useCallback(async (id: string, title: string) => {
+    const t = title.trim();
+    if (!t) return;
+    setTasks((prev) => prev.map((task) => (task.id === id ? { ...task, title: t } : task)));
+    await supabase.from("tasks").update({ title: t }).eq("id", id);
+  }, []);
+
+  const moveTask = useCallback(async (id: string, projectId: string) => {
     setTasks((prev) =>
-      prev.map((task) => (task.id === id ? { ...task, priority } : task))
+      prev.map((t) => (t.id === id ? { ...t, projectId } : t))
     );
+    await supabase
+      .from("tasks")
+      .update({ project_id: projectId === INBOX_ID ? null : projectId })
+      .eq("id", id);
   }, []);
 
-  const toggleTask = useCallback((id: string) => {
-    setTasks((prev) =>
-      prev.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task))
-    );
+  const setTaskPriority = useCallback(async (id: string, priority: Priority) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, priority } : t)));
+    await supabase.from("tasks").update({ priority }).eq("id", id);
   }, []);
 
-  const removeTask = useCallback((id: string) => {
-    setTasks((prev) => prev.filter((task) => task.id !== id));
-  }, []);
+  const clearCompleted = useCallback(
+    async (projectId?: string) => {
+      if (!user) return;
+      let q = supabase.from("tasks").delete().eq("user_id", user.id).eq("completed", true);
+      if (projectId) {
+        q = projectId === INBOX_ID ? q.is("project_id", null) : q.eq("project_id", projectId);
+      }
+      await q;
+      setTasks((prev) =>
+        prev.filter((t) => !t.completed || (projectId && t.projectId !== projectId))
+      );
+    },
+    [user]
+  );
 
-  const updateTask = useCallback((id: string, title: string) => {
-    setTasks((prev) =>
-      prev.map((task) => (task.id === id ? { ...task, title: title.trim() } : task))
-    );
-  }, []);
+  const addProject = useCallback(
+    async (name: string) => {
+      if (!user) return;
+      const n = name.trim();
+      if (!n) return;
+      const color = pickColor(projects);
+      const { data, error } = await supabase
+        .from("projects")
+        .insert({ user_id: user.id, name: n, color })
+        .select("*")
+        .single();
+      if (!error && data) {
+        setProjects((prev) => [...prev, dbToProject(data as DBProject)]);
+      }
+    },
+    [user, projects]
+  );
 
-  const moveTask = useCallback((id: string, projectId: string) => {
-    setTasks((prev) =>
-      prev.map((task) => (task.id === id ? { ...task, projectId } : task))
-    );
-  }, []);
-
-  const clearCompleted = useCallback((projectId?: string) => {
-    setTasks((prev) =>
-      prev.filter((t) => !t.completed || (projectId && t.projectId !== projectId))
-    );
-  }, []);
-
-  const addProject = useCallback((name: string) => {
-    const n = name.trim();
-    if (!n) return;
-    setProjects((prev) => [
-      ...prev,
-      { id: genId(), name: n, color: pickColor(prev), createdAt: Date.now() },
-    ]);
-  }, []);
-
-  const renameProject = useCallback((id: string, name: string) => {
+  const renameProject = useCallback(async (id: string, name: string) => {
     const n = name.trim();
     if (!n) return;
     setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name: n } : p)));
+    await supabase.from("projects").update({ name: n }).eq("id", id);
   }, []);
 
-  const removeProject = useCallback((id: string) => {
+  const removeProject = useCallback(async (id: string) => {
     setProjects((prev) => prev.filter((p) => p.id !== id));
     setTasks((prev) =>
       prev.map((t) => (t.projectId === id ? { ...t, projectId: INBOX_ID } : t))
     );
+    // FK is ON DELETE SET NULL so tasks survive
+    await supabase.from("projects").delete().eq("id", id);
   }, []);
 
   const stats = useMemo(
