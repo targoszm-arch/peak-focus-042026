@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useSEO } from "@/hooks/use-seo";
-import { Flame, Timer, ListTodo, Mountain } from "lucide-react";
+import { Flame, Timer, ListTodo, Mountain, HeartPulse } from "lucide-react";
 import { MountainVisualization } from "@/components/ui/MountainVisualization";
 import { Link } from "react-router-dom";
 
@@ -51,6 +51,15 @@ const Index = () => {
         >
           <ListTodo className="h-4 w-4" aria-hidden="true" />
           Manage Tasks
+        </Link>
+
+        <Link
+          to="/habits"
+          className="inline-flex w-full items-center justify-center gap-2 text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
+          aria-label="Track Habits"
+        >
+          <HeartPulse className="h-4 w-4" aria-hidden="true" />
+          Track Habits
         </Link>
       </section>
 
