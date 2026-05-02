@@ -5,6 +5,7 @@ interface MountainVisualizationProps {
   theme?: 'alpine' | 'desert' | 'volcanic' | 'coastal' | 'forest';
   mode?: 'shrink' | 'grow';
   label?: string;
+  size?: 'sm' | 'default';
 }
 
 export const MountainVisualization = ({
@@ -12,6 +13,7 @@ export const MountainVisualization = ({
   theme = 'alpine',
   mode = 'shrink',
   label = 'Complete',
+  size = 'default',
 }: MountainVisualizationProps) => {
   // Ensure percentage is between 0 and 100
   const safePercentage = Math.max(0, Math.min(100, completionPercentage));
@@ -20,8 +22,9 @@ export const MountainVisualization = ({
   const visibility = mode === 'grow' ? 100 - safePercentage : safePercentage;
 
   const mountainTranslateY = useMemo(() => {
-    return (visibility / 100) * 180;
-  }, [visibility]);
+    const max = size === 'sm' ? 80 : 180;
+    return (visibility / 100) * max;
+  }, [visibility, size]);
 
   const mountainOpacity = useMemo(() => {
     if (visibility < 50) return 1;
@@ -80,8 +83,11 @@ export const MountainVisualization = ({
   const colors = themeColors[theme];
 
   return (
-    <div 
-      className="relative w-full h-64 overflow-hidden rounded-lg bg-gradient-to-t from-blue-200 via-blue-300 to-yellow-100 transition-all duration-700 ease-out"
+    <div
+      className={
+        "relative w-full overflow-hidden rounded-lg bg-gradient-to-t from-blue-200 via-blue-300 to-yellow-100 transition-all duration-700 ease-out " +
+        (size === 'sm' ? 'h-28' : 'h-64')
+      }
       style={{
         backgroundImage: `linear-gradient(to top, 
           hsl(200 100% 80% / ${skyBrightness}), 

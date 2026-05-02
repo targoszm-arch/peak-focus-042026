@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useHabits } from "@/hooks/use-habits";
 import MoodLog from "@/components/habits/MoodLog";
+import { MountainVisualization } from "@/components/ui/MountainVisualization";
 
 const FEELING_HINTS: Record<string, string> = {
   weightUnhappy: "How unhappy are you with your weight today?",
@@ -83,10 +84,10 @@ export default function Habits() {
     setNote,
     setMood,
     weekMoods,
+    weeklyCounts,
     addHabit,
     removeHabit,
     updateHabitTarget,
-    weeklyCounts,
     last7Days,
     monthMatrix,
     monthlyStats,
@@ -95,6 +96,19 @@ export default function Habits() {
 
   const [newHabitLabel, setNewHabitLabel] = useState("");
   const [newHabitEmoji, setNewHabitEmoji] = useState("✨");
+
+  const mountainScore = useMemo(() => {
+    const totalTarget = habits.reduce((n, h) => n + h.weeklyTarget, 0);
+    const totalDone = habits.reduce(
+      (n, h) => n + Math.min(weeklyCounts[h.key] ?? 0, h.weeklyTarget),
+      0
+    );
+    const habitScore = totalTarget ? (totalDone / totalTarget) * 100 : 0;
+    const negSum =
+      todayEntry.weightUnhappy + todayEntry.inactivity + todayEntry.unhealthy;
+    const penalty = (negSum / 15) * 50;
+    return Math.max(0, Math.min(100, Math.round(habitScore - penalty)));
+  }, [habits, weeklyCounts, todayEntry]);
 
   const handleAddHabit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +139,16 @@ export default function Habits() {
             {currentStreak} day streak
           </span>
         </header>
+
+        <section aria-label="Habit progress visual">
+          <MountainVisualization
+            completionPercentage={mountainScore}
+            theme="alpine"
+            mode="grow"
+            label="Mountain"
+            size="sm"
+          />
+        </section>
 
         <Tabs defaultValue="today" className="w-full">
           <TabsList className="grid w-full grid-cols-3">

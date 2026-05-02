@@ -1,23 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type HabitKey = string;
 
 export type Habit = {
+  id: string;
   key: HabitKey;
   label: string;
   emoji: string;
-  weeklyTarget: number; // 1..7
+  weeklyTarget: number;
   builtin?: boolean;
 };
 
 export type DailyEntry = {
-  date: string; // YYYY-MM-DD
-  weightUnhappy: number; // 0-5
-  inactivity: number; // 0-5
-  unhealthy: number; // 0-5
+  date: string;
+  weightUnhappy: number;
+  inactivity: number;
+  unhealthy: number;
   habits: Record<HabitKey, boolean>;
   note?: string;
-  mood?: number | null; // 0..6, null = not logged
+  mood?: number | null;
 };
 
 export const MOOD_LABELS = [
@@ -30,16 +33,17 @@ export const MOOD_LABELS = [
   "Very pleasant",
 ];
 
-const ENTRIES_KEY = "pf.habits.entries.v2";
-const HABITS_KEY = "pf.habits.list.v2";
-
-export const DEFAULT_HABITS: Habit[] = [
+export const DEFAULT_HABITS: Omit<Habit, "id">[] = [
   { key: "run", label: "Run", emoji: "🏃‍♀️", weeklyTarget: 3, builtin: true },
   { key: "yoga", label: "Yoga", emoji: "🧘‍♀️", weeklyTarget: 2, builtin: true },
   { key: "sleepEarly", label: "Sleep early", emoji: "🌙", weeklyTarget: 7, builtin: true },
   { key: "wakeEarly", label: "Wake up early", emoji: "🌅", weeklyTarget: 7, builtin: true },
   { key: "freeWeights", label: "Free weights", emoji: "🏋️‍♀️", weeklyTarget: 2, builtin: true },
 ];
+
+const HABITS_MIGRATED_FLAG = "pf.habits.migrated.v1";
+const ENTRIES_LEGACY_KEY = "pf.habits.entries.v2";
+const HABITS_LEGACY_KEY = "pf.habits.list.v2";
 
 export function todayKey(d: Date = new Date()): string {
   const y = d.getFullYear();
@@ -50,7 +54,7 @@ export function todayKey(d: Date = new Date()): string {
 
 export function startOfWeek(d: Date): Date {
   const date = new Date(d);
-  const dow = (date.getDay() + 6) % 7; // Monday-first
+  const dow = (date.getDay() + 6) % 7;
   date.setHours(0, 0, 0, 0);
   date.setDate(date.getDate() - dow);
   return date;
@@ -60,25 +64,6 @@ export function addDays(d: Date, n: number): Date {
   const r = new Date(d);
   r.setDate(r.getDate() + n);
   return r;
-}
-
-function readJSON<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const data = JSON.parse(raw);
-    return data ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJSON(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
 }
 
 const blankEntry = (date: string): DailyEntry => ({
@@ -91,108 +76,290 @@ const blankEntry = (date: string): DailyEntry => ({
   mood: null,
 });
 
+async function ensureSeedHabits(userId: string) {
+  const { data } = await supabase
+    .from("habits")
+    .select("id")
+    .eq("user_id", userId)
+    .limit(1);
+  if (data && data.length > 0) return;
+  await supabase.from("habits").insert(
+    DEFAULT_HABITS.map((h) => ({
+      user_id: userId,
+      key: h.key,
+      label: h.label,
+      emoji: h.emoji,
+      weekly_target: h.weeklyTarget,
+      builtin: true,
+    }))
+  );
+}
+
+async function migrateHabitsLocalOnce(userId: string) {
+  if (localStorage.getItem(HABITS_MIGRATED_FLAG)) return;
+  try {
+    const localHabits = JSON.parse(localStorage.getItem(HABITS_LEGACY_KEY) || "[]");
+    const localEntries = JSON.parse(localStorage.getItem(ENTRIES_LEGACY_KEY) || "{}");
+
+    // Map old habit keys → new habit ids (after seeding)
+    if (Array.isArray(localHabits) && localHabits.length) {
+      const customs = localHabits.filter((h: any) => !h.builtin);
+      if (customs.length) {
+        await supabase.from("habits").insert(
+          customs.map((h: any) => ({
+            user_id: userId,
+            key: h.key,
+            label: h.label,
+            emoji: h.emoji ?? "✨",
+            weekly_target: h.weeklyTarget ?? 3,
+            builtin: false,
+          }))
+        );
+      }
+    }
+
+    const { data: dbHabits } = await supabase
+      .from("habits")
+      .select("id, key")
+      .eq("user_id", userId);
+    const keyToId: Record<string, string> = {};
+    for (const h of dbHabits ?? []) keyToId[h.key] = h.id;
+
+    const entryRows: any[] = [];
+    const logRows: any[] = [];
+    for (const k of Object.keys(localEntries)) {
+      const e = localEntries[k];
+      entryRows.push({
+        user_id: userId,
+        entry_date: e.date,
+        weight_unhappy: e.weightUnhappy ?? 0,
+        inactivity: e.inactivity ?? 0,
+        unhealthy: e.unhealthy ?? 0,
+        mood: e.mood ?? null,
+        note: e.note ?? "",
+      });
+      for (const habitKey of Object.keys(e.habits || {})) {
+        if (!e.habits[habitKey]) continue;
+        const habitId = keyToId[habitKey];
+        if (!habitId) continue;
+        logRows.push({
+          user_id: userId,
+          habit_id: habitId,
+          log_date: e.date,
+          done: true,
+        });
+      }
+    }
+    if (entryRows.length)
+      await supabase.from("daily_entries").upsert(entryRows, {
+        onConflict: "user_id,entry_date",
+      });
+    if (logRows.length)
+      await supabase.from("habit_logs").upsert(logRows, {
+        onConflict: "user_id,habit_id,log_date",
+      });
+  } catch (e) {
+    console.warn("[habits] migration failed", e);
+  }
+  localStorage.setItem(HABITS_MIGRATED_FLAG, "1");
+}
+
 export function useHabits() {
-  const [hydrated, setHydrated] = useState(false);
+  const { user } = useAuth();
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [entries, setEntries] = useState<Record<string, DailyEntry>>({});
-  const [habits, setHabits] = useState<Habit[]>(DEFAULT_HABITS);
-
-  // hydrate once
-  useEffect(() => {
-    setEntries(readJSON<Record<string, DailyEntry>>(ENTRIES_KEY, {}));
-    const stored = readJSON<Habit[]>(HABITS_KEY, DEFAULT_HABITS);
-    setHabits(Array.isArray(stored) && stored.length ? stored : DEFAULT_HABITS);
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (hydrated) writeJSON(ENTRIES_KEY, entries);
-  }, [entries, hydrated]);
-
-  useEffect(() => {
-    if (hydrated) writeJSON(HABITS_KEY, habits);
-  }, [habits, hydrated]);
 
   const today = todayKey();
+
+  const reload = useCallback(async () => {
+    if (!user) {
+      setHabits([]);
+      setEntries({});
+      return;
+    }
+    const [{ data: hs }, { data: ents }, { data: logs }] = await Promise.all([
+      supabase.from("habits").select("*").eq("user_id", user.id).order("created_at"),
+      supabase.from("daily_entries").select("*").eq("user_id", user.id),
+      supabase.from("habit_logs").select("*").eq("user_id", user.id).eq("done", true),
+    ]);
+    const habitList: Habit[] = (hs ?? []).map((h: any) => ({
+      id: h.id,
+      key: h.key,
+      label: h.label,
+      emoji: h.emoji,
+      weeklyTarget: h.weekly_target,
+      builtin: h.builtin,
+    }));
+    setHabits(habitList);
+
+    const habitIdToKey: Record<string, string> = {};
+    for (const h of habitList) habitIdToKey[h.id] = h.key;
+
+    const entryMap: Record<string, DailyEntry> = {};
+    for (const e of ents ?? []) {
+      entryMap[e.entry_date] = {
+        date: e.entry_date,
+        weightUnhappy: e.weight_unhappy,
+        inactivity: e.inactivity,
+        unhealthy: e.unhealthy,
+        mood: e.mood,
+        note: e.note ?? "",
+        habits: {},
+      };
+    }
+    for (const log of logs ?? []) {
+      const k = log.log_date;
+      if (!entryMap[k]) entryMap[k] = blankEntry(k);
+      const hkey = habitIdToKey[log.habit_id];
+      if (hkey) entryMap[k].habits[hkey] = true;
+    }
+    setEntries(entryMap);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      await ensureSeedHabits(user.id);
+      await migrateHabitsLocalOnce(user.id);
+      await reload();
+    })();
+  }, [user, reload]);
+
   const todayEntry = useMemo(
     () => entries[today] ?? blankEntry(today),
     [entries, today]
   );
 
-  const setFeeling = useCallback(
-    (key: "weightUnhappy" | "inactivity" | "unhealthy", value: number) => {
-      setEntries((prev) => {
-        const current = prev[today] ?? blankEntry(today);
-        if (current[key] === value) return prev;
-        return { ...prev, [today]: { ...current, [key]: value } };
-      });
+  const upsertEntry = useCallback(
+    async (patch: Partial<DailyEntry>) => {
+      if (!user) return;
+      const current = entries[today] ?? blankEntry(today);
+      const next = { ...current, ...patch };
+      setEntries((prev) => ({ ...prev, [today]: next }));
+      await supabase.from("daily_entries").upsert(
+        {
+          user_id: user.id,
+          entry_date: today,
+          weight_unhappy: next.weightUnhappy,
+          inactivity: next.inactivity,
+          unhealthy: next.unhealthy,
+          mood: next.mood ?? null,
+          note: next.note ?? "",
+        },
+        { onConflict: "user_id,entry_date" }
+      );
     },
-    [today]
+    [user, entries, today]
   );
 
-  const toggleHabit = useCallback(
-    (key: HabitKey) => {
-      setEntries((prev) => {
-        const current = prev[today] ?? blankEntry(today);
-        const next = { ...current.habits, [key]: !current.habits[key] };
-        return { ...prev, [today]: { ...current, habits: next } };
-      });
+  const setFeeling = useCallback(
+    (key: "weightUnhappy" | "inactivity" | "unhealthy", value: number) => {
+      void upsertEntry({ [key]: value } as Partial<DailyEntry>);
     },
-    [today]
+    [upsertEntry]
   );
 
   const setNote = useCallback(
     (note: string) => {
-      setEntries((prev) => {
-        const current = prev[today] ?? blankEntry(today);
-        if (current.note === note) return prev;
-        return { ...prev, [today]: { ...current, note } };
-      });
+      void upsertEntry({ note });
     },
-    [today]
+    [upsertEntry]
   );
 
   const setMood = useCallback(
     (mood: number | null) => {
-      setEntries((prev) => {
-        const current = prev[today] ?? blankEntry(today);
-        if (current.mood === mood) return prev;
-        return { ...prev, [today]: { ...current, mood } };
-      });
+      void upsertEntry({ mood });
     },
-    [today]
+    [upsertEntry]
   );
 
-  const weekMoods = useMemo(() => {
-    const start = startOfWeek(new Date());
-    const out: Array<{ date: string; mood: number | null }> = [];
-    for (let i = 0; i < 7; i++) {
-      const k = todayKey(addDays(start, i));
-      const e = entries[k];
-      out.push({ date: k, mood: e?.mood ?? null });
-    }
-    return out;
-  }, [entries]);
+  const toggleHabit = useCallback(
+    async (key: HabitKey) => {
+      if (!user) return;
+      const habit = habits.find((h) => h.key === key);
+      if (!habit) return;
+      const current = entries[today] ?? blankEntry(today);
+      const next = !current.habits[key];
+      setEntries((prev) => {
+        const e = prev[today] ?? blankEntry(today);
+        return { ...prev, [today]: { ...e, habits: { ...e.habits, [key]: next } } };
+      });
+      if (next) {
+        await supabase.from("habit_logs").upsert(
+          {
+            user_id: user.id,
+            habit_id: habit.id,
+            log_date: today,
+            done: true,
+          },
+          { onConflict: "user_id,habit_id,log_date" }
+        );
+      } else {
+        await supabase
+          .from("habit_logs")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("habit_id", habit.id)
+          .eq("log_date", today);
+      }
+    },
+    [user, habits, entries, today]
+  );
 
-  const addHabit = useCallback((label: string, emoji = "✨", weeklyTarget = 3) => {
-    const trimmed = label.trim();
-    if (!trimmed) return;
-    const key = `c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    setHabits((prev) => [...prev, { key, label: trimmed, emoji, weeklyTarget }]);
-  }, []);
+  const addHabit = useCallback(
+    async (label: string, emoji = "✨", weeklyTarget = 3) => {
+      if (!user) return;
+      const trimmed = label.trim();
+      if (!trimmed) return;
+      const key = `c_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const { data } = await supabase
+        .from("habits")
+        .insert({
+          user_id: user.id,
+          key,
+          label: trimmed,
+          emoji,
+          weekly_target: weeklyTarget,
+          builtin: false,
+        })
+        .select("*")
+        .single();
+      if (data) {
+        setHabits((prev) => [
+          ...prev,
+          {
+            id: data.id,
+            key: data.key,
+            label: data.label,
+            emoji: data.emoji,
+            weeklyTarget: data.weekly_target,
+            builtin: data.builtin,
+          },
+        ]);
+      }
+    },
+    [user]
+  );
 
-  const removeHabit = useCallback((key: HabitKey) => {
+  const removeHabit = useCallback(async (key: HabitKey) => {
+    const habit = habits.find((h) => h.key === key);
+    if (!habit) return;
     setHabits((prev) => prev.filter((h) => h.key !== key));
-  }, []);
+    await supabase.from("habits").delete().eq("id", habit.id);
+  }, [habits]);
 
-  const updateHabitTarget = useCallback((key: HabitKey, weeklyTarget: number) => {
-    setHabits((prev) =>
-      prev.map((h) =>
-        h.key === key
-          ? { ...h, weeklyTarget: Math.max(1, Math.min(7, weeklyTarget)) }
-          : h
-      )
-    );
-  }, []);
+  const updateHabitTarget = useCallback(
+    async (key: HabitKey, weeklyTarget: number) => {
+      const wt = Math.max(1, Math.min(7, weeklyTarget));
+      const habit = habits.find((h) => h.key === key);
+      if (!habit) return;
+      setHabits((prev) =>
+        prev.map((h) => (h.key === key ? { ...h, weeklyTarget: wt } : h))
+      );
+      await supabase.from("habits").update({ weekly_target: wt }).eq("id", habit.id);
+    },
+    [habits]
+  );
 
   const weeklyCounts = useMemo(() => {
     const start = startOfWeek(new Date());
@@ -218,12 +385,8 @@ export function useHabits() {
   const monthMatrix = useMemo(() => {
     const now = new Date();
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    const daysInMonth = new Date(
-      now.getFullYear(),
-      now.getMonth() + 1,
-      0
-    ).getDate();
-    const leadOffset = (first.getDay() + 6) % 7; // Mon-first
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const leadOffset = (first.getDay() + 6) % 7;
     const cells: Array<{ date: string | null; entry?: DailyEntry; isToday?: boolean }> = [];
     for (let i = 0; i < leadOffset; i++) cells.push({ date: null });
     const todayStr = todayKey();
@@ -294,8 +457,19 @@ export function useHabits() {
     return streak;
   }, [entries, habits]);
 
+  const weekMoods = useMemo(() => {
+    const start = startOfWeek(new Date());
+    const out: Array<{ date: string; mood: number | null }> = [];
+    for (let i = 0; i < 7; i++) {
+      const k = todayKey(addDays(start, i));
+      const e = entries[k];
+      out.push({ date: k, mood: e?.mood ?? null });
+    }
+    return out;
+  }, [entries]);
+
   return {
-    hydrated,
+    hydrated: !!user,
     habits,
     todayEntry,
     setFeeling,
