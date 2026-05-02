@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+export type Priority = "high" | "medium" | "low" | "none";
+
 export type Task = {
   id: string;
   title: string;
   completed: boolean;
   createdAt: number;
   projectId: string; // "inbox" or a project id
+  priority: Priority;
 };
 
 export type Project = {
@@ -59,6 +62,14 @@ function writeJSON(key: string, value: unknown) {
   }
 }
 
+const PRIORITIES: Priority[] = ["high", "medium", "low", "none"];
+
+function normalizePriority(p: unknown): Priority {
+  return typeof p === "string" && (PRIORITIES as string[]).includes(p)
+    ? (p as Priority)
+    : "none";
+}
+
 function migrateTasks(raw: any[]): Task[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((t) => ({
@@ -67,6 +78,7 @@ function migrateTasks(raw: any[]): Task[] {
     completed: !!t.completed,
     createdAt: Number(t.createdAt ?? Date.now()),
     projectId: typeof t.projectId === "string" && t.projectId ? t.projectId : INBOX_ID,
+    priority: normalizePriority(t.priority),
   }));
 }
 
@@ -89,13 +101,29 @@ export function useTasks() {
     if (hydrated) writeJSON(PROJECTS_KEY, projects);
   }, [projects, hydrated]);
 
-  const addTask = useCallback((title: string, projectId: string = INBOX_ID) => {
-    const t = title.trim();
-    if (!t) return;
-    setTasks((prev) => [
-      { id: genId(), title: t, completed: false, createdAt: Date.now(), projectId },
-      ...prev,
-    ]);
+  const addTask = useCallback(
+    (title: string, projectId: string = INBOX_ID, priority: Priority = "none") => {
+      const t = title.trim();
+      if (!t) return;
+      setTasks((prev) => [
+        {
+          id: genId(),
+          title: t,
+          completed: false,
+          createdAt: Date.now(),
+          projectId,
+          priority,
+        },
+        ...prev,
+      ]);
+    },
+    []
+  );
+
+  const setTaskPriority = useCallback((id: string, priority: Priority) => {
+    setTasks((prev) =>
+      prev.map((task) => (task.id === id ? { ...task, priority } : task))
+    );
   }, []);
 
   const toggleTask = useCallback((id: string) => {
@@ -182,6 +210,7 @@ export function useTasks() {
     removeTask,
     updateTask,
     moveTask,
+    setTaskPriority,
     clearCompleted,
     addProject,
     renameProject,

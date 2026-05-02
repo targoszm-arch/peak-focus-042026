@@ -17,7 +17,18 @@ export type DailyEntry = {
   unhealthy: number; // 0-5
   habits: Record<HabitKey, boolean>;
   note?: string;
+  mood?: number | null; // 0..6, null = not logged
 };
+
+export const MOOD_LABELS = [
+  "Very unpleasant",
+  "Unpleasant",
+  "Slightly unpleasant",
+  "Neutral",
+  "Slightly pleasant",
+  "Pleasant",
+  "Very pleasant",
+];
 
 const ENTRIES_KEY = "pf.habits.entries.v2";
 const HABITS_KEY = "pf.habits.list.v2";
@@ -77,6 +88,7 @@ const blankEntry = (date: string): DailyEntry => ({
   unhealthy: 0,
   habits: {},
   note: "",
+  mood: null,
 });
 
 export function useHabits() {
@@ -138,6 +150,28 @@ export function useHabits() {
     },
     [today]
   );
+
+  const setMood = useCallback(
+    (mood: number | null) => {
+      setEntries((prev) => {
+        const current = prev[today] ?? blankEntry(today);
+        if (current.mood === mood) return prev;
+        return { ...prev, [today]: { ...current, mood } };
+      });
+    },
+    [today]
+  );
+
+  const weekMoods = useMemo(() => {
+    const start = startOfWeek(new Date());
+    const out: Array<{ date: string; mood: number | null }> = [];
+    for (let i = 0; i < 7; i++) {
+      const k = todayKey(addDays(start, i));
+      const e = entries[k];
+      out.push({ date: k, mood: e?.mood ?? null });
+    }
+    return out;
+  }, [entries]);
 
   const addHabit = useCallback((label: string, emoji = "✨", weeklyTarget = 3) => {
     const trimmed = label.trim();
@@ -267,6 +301,8 @@ export function useHabits() {
     setFeeling,
     toggleHabit,
     setNote,
+    setMood,
+    weekMoods,
     addHabit,
     removeHabit,
     updateHabitTarget,

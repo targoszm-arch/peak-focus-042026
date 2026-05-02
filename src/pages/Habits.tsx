@@ -15,6 +15,7 @@ import {
   Minus,
 } from "lucide-react";
 import { useHabits } from "@/hooks/use-habits";
+import MoodLog from "@/components/habits/MoodLog";
 
 const FEELING_HINTS: Record<string, string> = {
   weightUnhappy: "How unhappy are you with your weight today?",
@@ -80,6 +81,8 @@ export default function Habits() {
     setFeeling,
     toggleHabit,
     setNote,
+    setMood,
+    weekMoods,
     addHabit,
     removeHabit,
     updateHabitTarget,
@@ -131,6 +134,11 @@ export default function Habits() {
           </TabsList>
 
           <TabsContent value="today" className="space-y-4">
+            <MoodLog
+              value={todayEntry.mood ?? null}
+              onChange={setMood}
+              weekMoods={weekMoods}
+            />
             <section className="space-y-2" aria-label="Daily check-in">
               <h2 className="text-sm font-semibold text-muted-foreground">
                 How do you feel today? (1 = a little, 5 = a lot)
