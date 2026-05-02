@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MOOD_LABELS } from "@/hooks/use-habits";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Check } from "lucide-react";
+import { Check, Plus } from "lucide-react";
+import { useTasks } from "@/hooks/use-tasks";
+import AddTaskDialog from "@/components/tasks/AddTaskDialog";
 
 const MOOD_COLORS = [
   "from-indigo-700 to-indigo-900",
@@ -15,6 +17,16 @@ const MOOD_COLORS = [
 ];
 
 type Step = "slider" | "confirmed";
+
+const MOOD_REFLECTIONS = [
+  "There's heaviness in your day. Be gentle — even small care counts.",
+  "A hard day. Notice what helped you keep going.",
+  "Mixed signals. Steadiness can grow from rest as much as action.",
+  "There's a sense of steadiness in the way you cared for both the present and the future.",
+  "A small lift. What nudged you upward today?",
+  "A bright current. Anchor what worked so you can find it again.",
+  "A soaring day. Let yourself fully feel it.",
+];
 
 function timeAgo(seconds: number): string {
   if (seconds < 5) return "just now";
@@ -39,6 +51,17 @@ export default function MoodLog({
   const [draft, setDraft] = useState<number>(value ?? 3);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [now, setNow] = useState<number>(Date.now());
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
+
+  const { tasks } = useTasks();
+  const todaysCompleted = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const startMs = start.getTime();
+    return tasks.filter(
+      (t) => t.completed && t.completedAt && t.completedAt >= startMs
+    );
+  }, [tasks]);
 
   useEffect(() => {
     if (open) {
@@ -181,43 +204,86 @@ export default function MoodLog({
           )}
 
           {step === "confirmed" && savedAt !== null && (
-            <div className="flex flex-1 flex-col items-center justify-between px-6 pb-8">
-              <div className="flex flex-1 flex-col items-center justify-center gap-6">
+            <div className="flex flex-1 flex-col overflow-y-auto px-6 pb-8">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setStep("slider")}
+                  className="rounded-full bg-muted px-3 py-1 text-xs font-medium"
+                >
+                  Edit
+                </button>
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Logged {timeAgo(Math.floor((now - savedAt) / 1000))}
+                </p>
+              </div>
+
+              <div className="mt-2 flex flex-col items-center gap-3">
                 <div
                   className={
-                    "h-40 w-40 rounded-full bg-gradient-to-br shadow-lg " +
+                    "h-28 w-28 rounded-full bg-gradient-to-br shadow-lg " +
                     MOOD_COLORS[draft]
                   }
                   aria-hidden="true"
                 />
-                <h3 className="text-2xl font-semibold">Logged in Wellbeing</h3>
+                <h3 className="text-2xl font-semibold">Daily reflection</h3>
+                <p className="text-center text-sm text-muted-foreground">
+                  You noted feeling{" "}
+                  <strong className="text-foreground">{MOOD_LABELS[draft]}</strong>{" "}
+                  on{" "}
+                  {new Date().toLocaleDateString(undefined, {
+                    month: "long",
+                    day: "numeric",
+                  })}
+                  .
+                </p>
+                <p className="text-center text-sm italic text-muted-foreground">
+                  "{MOOD_REFLECTIONS[draft]}"
+                </p>
               </div>
 
-              <div className="w-full max-w-sm space-y-4">
-                <div className="rounded-2xl border bg-card p-4">
-                  <p className="text-sm">
-                    Today, you had a{" "}
-                    <strong>{MOOD_LABELS[draft].toLowerCase()}</strong> day.
-                  </p>
-                  <div className="mt-3 flex items-center justify-between rounded-xl border bg-background/60 px-3 py-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-primary" aria-hidden="true" />
-                      <span>Logged {timeAgo(Math.floor((now - savedAt) / 1000))}</span>
-                    </div>
-                    <div
-                      className={
-                        "h-6 w-6 rounded-full bg-gradient-to-br " +
-                        MOOD_COLORS[draft]
-                      }
-                      aria-hidden="true"
-                    />
-                  </div>
+              <section className="mt-8" aria-label="Completed tasks today">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-base font-semibold">
+                    Completed tasks ({todaysCompleted.length})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setAddTaskOpen(true)}
+                    aria-label="Add task"
+                    className="rounded-full bg-muted p-1.5 text-muted-foreground hover:bg-accent"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
                 </div>
 
-                <Button
-                  className="w-full"
-                  onClick={() => setOpen(false)}
-                >
+                <ul className="mt-3 space-y-2">
+                  {todaysCompleted.length === 0 ? (
+                    <li className="rounded-xl border border-dashed p-3 text-center text-xs text-muted-foreground">
+                      No tasks completed yet today. Tap + to add one.
+                    </li>
+                  ) : (
+                    todaysCompleted.map((t) => (
+                      <li
+                        key={t.id}
+                        className="flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5"
+                      >
+                        <span
+                          className="h-7 w-7 rounded-full bg-gradient-to-br from-orange-300 to-pink-400"
+                          aria-hidden="true"
+                        />
+                        <span className="flex-1 text-sm font-medium">
+                          {t.title}
+                        </span>
+                        <Check className="h-4 w-4 text-primary" />
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </section>
+
+              <div className="mt-auto pt-6">
+                <Button className="w-full" onClick={() => setOpen(false)}>
                   Done
                 </Button>
               </div>
@@ -225,6 +291,8 @@ export default function MoodLog({
           )}
         </div>
       )}
+
+      <AddTaskDialog open={addTaskOpen} onClose={() => setAddTaskOpen(false)} />
     </section>
   );
 }

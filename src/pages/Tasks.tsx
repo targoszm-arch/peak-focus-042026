@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useSEO } from "@/hooks/use-seo";
 import { useTasks, INBOX_ID, type Priority, type Task } from "@/hooks/use-tasks";
 import TaskInput from "@/components/tasks/TaskInput";
+import AddTaskDialog from "@/components/tasks/AddTaskDialog";
 import {
   ListTodo,
   FolderPlus,
@@ -249,6 +250,7 @@ export default function Tasks() {
   const [newProjectName, setNewProjectName] = useState("");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [openSections, setOpenSections] = useState<
     Record<Exclude<Priority, "none">, boolean>
   >({ high: true, medium: true, low: true });
@@ -498,9 +500,22 @@ export default function Tasks() {
                 )}
               </div>
 
-              <TaskInput
-                onAdd={(title) => addTask(title, activeProjectId)}
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <TaskInput
+                    onAdd={(title) => addTask(title, activeProjectId)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Open detailed task editor"
+                  onClick={() => setAddTaskOpen(true)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </div>
 
               <div aria-live="polite" aria-atomic="true">
                 {visibleTasks.length === 0 ? (
@@ -555,6 +570,11 @@ export default function Tasks() {
           </TabsContent>
         </Tabs>
       </article>
+      <AddTaskDialog
+        open={addTaskOpen}
+        onClose={() => setAddTaskOpen(false)}
+        defaultProjectId={activeProjectId}
+      />
     </main>
   );
 }

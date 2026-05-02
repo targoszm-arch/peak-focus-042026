@@ -3,14 +3,35 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 export type Priority = "high" | "medium" | "low" | "none";
+export type TimeOfDay = "anytime" | "morning" | "afternoon" | "evening" | "at_time";
+export type Repeat = "none" | "daily" | "weekdays" | "weekly" | "monthly";
 
 export type Task = {
   id: string;
   title: string;
   completed: boolean;
   createdAt: number;
+  completedAt: number | null;
   projectId: string; // INBOX_ID or a project id
   priority: Priority;
+  startsAt: string | null; // ISO
+  endsAt: string | null; // ISO
+  timeOfDay: TimeOfDay;
+  repeat: Repeat;
+  notes: string;
+  parentId: string | null;
+};
+
+export type NewTaskInput = {
+  title: string;
+  projectId?: string;
+  priority?: Priority;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  timeOfDay?: TimeOfDay;
+  repeat?: Repeat;
+  notes?: string;
+  parentId?: string | null;
 };
 
 export type Project = {
@@ -47,6 +68,13 @@ type DBTask = {
   priority: Priority;
   project_id: string | null;
   created_at: string;
+  completed_at: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  time_of_day: TimeOfDay | null;
+  repeat: Repeat | null;
+  notes: string | null;
+  parent_id: string | null;
 };
 type DBProject = { id: string; name: string; color: string; created_at: string };
 
@@ -56,8 +84,15 @@ function dbToTask(row: DBTask): Task {
     title: row.title,
     completed: row.completed,
     createdAt: new Date(row.created_at).getTime(),
+    completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
     projectId: row.project_id ?? INBOX_ID,
     priority: row.priority,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    timeOfDay: row.time_of_day ?? "anytime",
+    repeat: row.repeat ?? "none",
+    notes: row.notes ?? "",
+    parentId: row.parent_id,
   };
 }
 
@@ -103,6 +138,9 @@ async function migrateLocalStorageOnce(userId: string) {
           ? t.priority
           : "none",
         project_id: idMap[t.projectId] ?? null,
+        time_of_day: "anytime",
+        repeat: "none",
+        notes: "",
       }));
       await supabase.from("tasks").insert(rows);
     }
@@ -145,37 +183,102 @@ export function useTasks() {
   }, [user, reload]);
 
   const addTask = useCallback(
-    async (title: string, projectId: string = INBOX_ID, priority: Priority = "none") => {
+    async (
+      titleOrInput: string | NewTaskInput,
+      projectId: string = INBOX_ID,
+      priority: Priority = "none"
+    ) => {
       if (!user) return;
-      const t = title.trim();
+      const input: NewTaskInput =
+        typeof titleOrInput === "string"
+          ? { title: titleOrInput, projectId, priority }
+          : titleOrInput;
+      const t = input.title.trim();
       if (!t) return;
+      const pid = input.projectId ?? INBOX_ID;
       const { data, error } = await supabase
         .from("tasks")
         .insert({
           user_id: user.id,
           title: t,
-          priority,
-          project_id: projectId === INBOX_ID ? null : projectId,
+          priority: input.priority ?? "none",
+          project_id: pid === INBOX_ID ? null : pid,
+          starts_at: input.startsAt ?? null,
+          ends_at: input.endsAt ?? null,
+          time_of_day: input.timeOfDay ?? "anytime",
+          repeat: input.repeat ?? "none",
+          notes: input.notes ?? "",
+          parent_id: input.parentId ?? null,
         })
         .select("*")
         .single();
       if (!error && data) {
         setTasks((prev) => [dbToTask(data as DBTask), ...prev]);
       }
+      return data ? (data as DBTask).id : undefined;
     },
     [user]
+  );
+
+  const updateTaskFields = useCallback(
+    async (id: string, patch: Partial<NewTaskInput>) => {
+      const dbPatch: Record<string, unknown> = {};
+      const localPatch: Partial<Task> = {};
+      if (patch.title !== undefined) {
+        dbPatch.title = patch.title.trim();
+        localPatch.title = patch.title.trim();
+      }
+      if (patch.priority !== undefined) {
+        dbPatch.priority = patch.priority;
+        localPatch.priority = patch.priority;
+      }
+      if (patch.projectId !== undefined) {
+        dbPatch.project_id = patch.projectId === INBOX_ID ? null : patch.projectId;
+        localPatch.projectId = patch.projectId;
+      }
+      if (patch.startsAt !== undefined) {
+        dbPatch.starts_at = patch.startsAt;
+        localPatch.startsAt = patch.startsAt;
+      }
+      if (patch.endsAt !== undefined) {
+        dbPatch.ends_at = patch.endsAt;
+        localPatch.endsAt = patch.endsAt;
+      }
+      if (patch.timeOfDay !== undefined) {
+        dbPatch.time_of_day = patch.timeOfDay;
+        localPatch.timeOfDay = patch.timeOfDay;
+      }
+      if (patch.repeat !== undefined) {
+        dbPatch.repeat = patch.repeat;
+        localPatch.repeat = patch.repeat;
+      }
+      if (patch.notes !== undefined) {
+        dbPatch.notes = patch.notes;
+        localPatch.notes = patch.notes;
+      }
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...localPatch } : t))
+      );
+      await supabase.from("tasks").update(dbPatch).eq("id", id);
+    },
+    []
   );
 
   const toggleTask = useCallback(
     async (id: string) => {
       const target = tasks.find((t) => t.id === id);
       if (!target) return;
+      const next = !target.completed;
       setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+        prev.map((t) =>
+          t.id === id
+            ? { ...t, completed: next, completedAt: next ? Date.now() : null }
+            : t
+        )
       );
       await supabase
         .from("tasks")
-        .update({ completed: !target.completed })
+        .update({ completed: next })
         .eq("id", id);
     },
     [tasks]
@@ -290,6 +393,7 @@ export function useTasks() {
     toggleTask,
     removeTask,
     updateTask,
+    updateTaskFields,
     moveTask,
     setTaskPriority,
     clearCompleted,
