@@ -49,11 +49,15 @@ export default function AddTaskDialog({
   onClose,
   defaultProjectId = INBOX_ID,
   defaultPriority = "none",
+  defaultTimeOfDay,
+  defaultStartDate,
 }: {
   open: boolean;
   onClose: () => void;
   defaultProjectId?: string;
   defaultPriority?: Priority;
+  defaultTimeOfDay?: TimeOfDay;
+  defaultStartDate?: Date;
 }) {
   const { addTask, projects } = useTasks();
   const [title, setTitle] = useState("");
@@ -74,9 +78,18 @@ export default function AddTaskDialog({
     setTitle("");
     setPriority(defaultPriority);
     setProjectId(defaultProjectId);
-    setTimeOfDay("at_time");
-    const now = new Date();
-    const start = new Date(now.getTime() + 5 * 60_000);
+    setTimeOfDay(defaultTimeOfDay ?? "at_time");
+    const baseDay = defaultStartDate ? new Date(defaultStartDate) : new Date();
+    const defaultHour =
+      defaultTimeOfDay === "morning"
+        ? 9
+        : defaultTimeOfDay === "afternoon"
+          ? 14
+          : defaultTimeOfDay === "evening"
+            ? 19
+            : new Date().getHours();
+    const start = new Date(baseDay);
+    start.setHours(defaultHour, 0, 0, 0);
     const end = new Date(start.getTime() + 30 * 60_000);
     const sp = isoLocalToParts(start.toISOString());
     const ep = isoLocalToParts(end.toISOString());
@@ -84,11 +97,11 @@ export default function AddTaskDialog({
     setStartTime(sp.time);
     setEndDate(ep.date);
     setEndTime(ep.time);
-    setRepeat("daily");
+    setRepeat("none");
     setNotes("");
     setSubtasks([]);
     setSubDraft("");
-  }, [open, defaultPriority, defaultProjectId]);
+  }, [open, defaultPriority, defaultProjectId, defaultTimeOfDay, defaultStartDate]);
 
   if (!open) return null;
 

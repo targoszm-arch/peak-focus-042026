@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from "react-router-dom";
-import { Home, Timer, ListTodo, Camera, BarChart2, Settings as Cog, HeartPulse } from "lucide-react";
+import { Home, Timer, ListTodo, Camera, CalendarDays, Settings as Cog, HeartPulse } from "lucide-react";
 
 function NavIconLink({ to, label, end, children }: { to: string; label: string; end?: boolean; children: React.ReactNode }) {
   return (
@@ -29,6 +29,9 @@ export default function AppLayout() {
           <NavIconLink to="/" label="Home" end>
             <Home className="h-5 w-5" />
           </NavIconLink>
+          <NavIconLink to="/progress" label="Plan">
+            <CalendarDays className="h-5 w-5" />
+          </NavIconLink>
           <NavIconLink to="/focus" label="Focus">
             <Timer className="h-5 w-5" />
           </NavIconLink>
@@ -40,9 +43,6 @@ export default function AppLayout() {
           </NavIconLink>
           <NavIconLink to="/habits" label="Habits">
             <HeartPulse className="h-5 w-5" />
-          </NavIconLink>
-          <NavIconLink to="/progress" label="Progress">
-            <BarChart2 className="h-5 w-5" />
           </NavIconLink>
           <NavIconLink to="/settings" label="Settings">
             <Cog className="h-5 w-5" />
