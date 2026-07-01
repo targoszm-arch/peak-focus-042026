@@ -149,12 +149,7 @@ export default function SignIn() {
         </p>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="w-full space-y-3"
-        method="post"
-        action="#"
-      >
+      <form onSubmit={handleSubmit} className="w-full space-y-3">
         <Input
           type="email"
           name="email"
