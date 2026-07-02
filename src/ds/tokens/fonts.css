@@ -1,0 +1,6 @@
+/* Peak Focus — Webfonts
+   SF Pro Display (Figma UI font) is not web-licensable; Inter is the
+   substitute for all UI/body text. Plus Jakarta Sans (used in the file
+   for display) is kept for headings. Both from Google Fonts. */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');

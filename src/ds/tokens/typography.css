@@ -1,0 +1,38 @@
+/* Peak Focus — Typography tokens
+   Figma uses SF Pro Display (not web-licensable) → substituted with Inter
+   for UI/body. Plus Jakarta Sans (present in the file) is kept for display
+   headings. See fonts.css for the @font-face / import. */
+
+:root {
+  /* Families */
+  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Weights */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* Type scale — matches the dashboard's dense 12/14 UI rhythm */
+  --text-2xs:  10px;
+  --text-xs:   12px;
+  --text-sm:   14px;   /* default UI text */
+  --text-base: 16px;
+  --text-lg:   20px;
+  --text-xl:   24px;
+  --text-2xl:  28px;
+  --text-3xl:  32px;
+  --text-4xl:  40px;
+
+  /* Line heights */
+  --leading-tight:  1.2;
+  --leading-snug:   1.35;
+  --leading-normal: 1.5;
+
+  /* Letter spacing */
+  --tracking-tight:  -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.04em;
+}

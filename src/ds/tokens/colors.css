@@ -1,0 +1,88 @@
+/* Peak Focus — Color tokens
+   Warm-blue task-management palette. Values transcribed from the
+   Asanah Figma variable collection (primary blue + warm orange accent,
+   cool navy-tinted neutrals). Do not round these hexes. */
+
+:root {
+  /* ---- Base palette: Neutrals (cool, navy-tinted) ---- */
+  --neutral-0:   #FFFFFF;
+  --neutral-50:  #F7F9FB;
+  --neutral-100: #EFF3F8;
+  --neutral-200: #E0E6F0;
+  --neutral-300: #C5CFDD;
+  --neutral-400: #8796AF;
+  --neutral-500: #596881;
+  --neutral-600: #3E4A60;
+  --neutral-700: #2D384C;
+  --neutral-800: #1D2433;
+  --neutral-900: #111625;  /* signature deep navy — primary text */
+
+  /* ---- Base palette: Primary (warm blue) ---- */
+  --primary-50:  #E9F0FE;
+  --primary-100: #D2E1FD;
+  --primary-200: #A9C6FB;
+  --primary-300: #7BA5F8;
+  --primary-400: #4E86F4;
+  --primary-500: #266DF0;  /* brand blue */
+  --primary-600: #1B57C9;
+  --primary-700: #16459E;
+
+  /* ---- Base palette: Secondary (warm coral / orange) ---- */
+  --secondary-50:  #FEF0EC;
+  --secondary-100: #FBD9CF;
+  --secondary-300: #F6A48C;
+  --secondary-400: #F48160;
+  --secondary-500: #F1613C;  /* accent — CTAs, stat-card icons */
+  --secondary-600: #D6461F;
+
+  /* ---- Semantic hues ---- */
+  --green-50:  #EBF9F4;
+  --green-500: #33B586;
+  --green-600: #2A9E75;
+  --red-50:    #FCE8EC;
+  --red-500:   #DF1C41;
+  --yellow-50: #FEF6E7;
+  --yellow-500:#E6A609;
+
+  /* ================= Semantic aliases ================= */
+
+  /* Surfaces */
+  --surface-page:    var(--neutral-50);
+  --surface-card:    var(--neutral-0);
+  --surface-sunken:  var(--neutral-100);
+  --surface-inverse: var(--neutral-900);
+  --surface-hover:   var(--neutral-100);
+
+  /* Text */
+  --text-primary:   var(--neutral-900);
+  --text-secondary: var(--neutral-500);
+  --text-tertiary:  var(--neutral-400);
+  --text-disabled:  var(--neutral-300);
+  --text-inverse:   var(--neutral-0);
+  --text-brand:     var(--primary-500);
+  --text-accent:    var(--secondary-500);
+
+  /* Borders & strokes */
+  --border-soft:   var(--neutral-200);
+  --border-strong: var(--neutral-300);
+  --border-focus:  var(--primary-500);
+
+  /* Interactive */
+  --action-primary:        var(--primary-500);
+  --action-primary-hover:  var(--primary-600);
+  --action-accent:         var(--secondary-500);
+  --action-accent-hover:   var(--secondary-600);
+
+  /* Status */
+  --status-success:    var(--green-600);
+  --status-success-bg: var(--green-50);
+  --status-danger:     var(--red-500);
+  --status-danger-bg:  var(--red-50);
+  --status-warning:    var(--yellow-500);
+  --status-warning-bg: var(--yellow-50);
+  --status-info:       var(--primary-500);
+  --status-info-bg:    var(--primary-50);
+
+  /* Focus ring */
+  --ring: 0 0 0 3px rgba(38, 109, 240, 0.28);
+}

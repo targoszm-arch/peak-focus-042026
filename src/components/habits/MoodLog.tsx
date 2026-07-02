@@ -143,12 +143,13 @@ export default function MoodLog({
       </div>
 
       {open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Log mood"
-          className="fixed inset-0 z-50 flex flex-col bg-background"
-        >
+        <div className="fixed inset-0 z-50 flex justify-center bg-black/40">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Log mood"
+            className="flex h-full w-full max-w-md flex-col bg-background shadow-xl"
+          >
           <div className="flex justify-end p-4">
             <button
               type="button"
@@ -289,6 +290,7 @@ export default function MoodLog({
               </div>
             </div>
           )}
+          </div>
         </div>
       )}
 

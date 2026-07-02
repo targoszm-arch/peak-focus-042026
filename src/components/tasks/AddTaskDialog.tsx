@@ -155,12 +155,13 @@ export default function AddTaskDialog({
   const priorityColor = priority === "none" ? undefined : PRIORITY_DOTS[priority];
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Add task"
-      className="fixed inset-0 z-50 flex flex-col bg-background"
-    >
+    <div className="fixed inset-0 z-50 flex justify-center bg-black/40">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Add task"
+        className="flex h-full w-full max-w-md flex-col bg-background shadow-xl"
+      >
       <header className="flex items-center justify-between p-4">
         <button
           type="button"
@@ -315,6 +316,7 @@ export default function AddTaskDialog({
             className="resize-none border-0 bg-transparent focus-visible:ring-0"
           />
         </div>
+      </div>
       </div>
     </div>
   );

@@ -4,9 +4,20 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
-import * as P from "./pages";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import SignIn from "@/pages/SignIn";
+import Dashboard from "@/screens/Dashboard";
+import Today from "@/screens/Today";
+import Tasks from "@/screens/Tasks";
+import Projects from "@/screens/Projects";
+import Clients from "@/screens/Clients";
+import People from "@/screens/People";
+import Habits from "@/screens/Habits";
+import Focus from "@/screens/Focus";
+import Health from "@/screens/Health";
+import Integrations from "@/screens/Integrations";
+import Settings from "@/screens/Settings";
+import Placeholder from "@/screens/Placeholder";
 
 const queryClient = new QueryClient();
 
@@ -33,39 +44,18 @@ const App = () => (
           <AuthGate>
             <Routes>
               <Route element={<AppLayout />}>
-                <Route index element={<P.Index />} />
-                <Route path="home" element={<P.Index />} />
-
-                <Route path="focus">
-                  <Route index element={<P.Focus />} />
-                  <Route path="timer-settings" element={<P.FocusSettings />} />
-                </Route>
-
-                <Route path="mountains">
-                  <Route index element={<P.Mountains />} />
-                  <Route path=":id" element={<P.MountainDetail />} />
-                </Route>
-
-                <Route path="capture">
-                  <Route index element={<P.Capture />} />
-                  <Route path="new" element={<P.CaptureNew />} />
-                </Route>
-
-                <Route path="progress">
-                  <Route index element={<P.Progress />} />
-                  <Route path=":period" element={<P.ProgressPeriod />} />
-                </Route>
-
-                <Route path="tasks" element={<P.Tasks />} />
-                <Route path="health" element={<P.Health />} />
-                <Route path="habits" element={<P.Habits />} />
-
-                <Route path="settings">
-                  <Route index element={<P.Settings />} />
-                  <Route path="notifications" element={<P.SettingsNotifications />} />
-                </Route>
-
-                <Route path="*" element={<P.NotFound />} />
+                <Route index element={<Dashboard />} />
+                <Route path="today" element={<Today />} />
+                <Route path="tasks" element={<Tasks />} />
+                <Route path="projects" element={<Projects />} />
+                <Route path="clients" element={<Clients />} />
+                <Route path="people" element={<People />} />
+                <Route path="habits" element={<Habits />} />
+                <Route path="focus" element={<Focus />} />
+                <Route path="health" element={<Health />} />
+                <Route path="integrations" element={<Integrations />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="*" element={<Placeholder title="Not found" />} />
               </Route>
             </Routes>
           </AuthGate>
