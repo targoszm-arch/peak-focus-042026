@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { createContext, createElement, useContext, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -31,7 +32,7 @@ function rowToProject(r: any): ProjectFull {
   };
 }
 
-export function useProjects() {
+function useProjectsState() {
   const { user } = useAuth();
   const [projects, setProjects] = useState<ProjectFull[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,4 +95,18 @@ export function useProjects() {
   }, []);
 
   return { projects, loading, addProject, updateProject, removeProject, reload };
+}
+
+type ProjectsValue = ReturnType<typeof useProjectsState>;
+const ProjectsContext = createContext<ProjectsValue | null>(null);
+
+export function ProjectsProvider({ children }: { children: ReactNode }) {
+  const value = useProjectsState();
+  return createElement(ProjectsContext.Provider, { value }, children);
+}
+
+export function useProjects(): ProjectsValue {
+  const ctx = useContext(ProjectsContext);
+  if (!ctx) throw new Error("useProjects must be used within ProjectsProvider");
+  return ctx;
 }

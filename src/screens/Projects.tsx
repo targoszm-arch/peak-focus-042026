@@ -47,7 +47,7 @@ export default function Projects() {
   };
 
   return (
-    <div className="pf-page" style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 32px 56px" }}>
+    <div className="pf-page" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 56px" }}>
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>

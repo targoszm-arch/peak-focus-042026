@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, createElement, useContext, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -25,7 +26,7 @@ function rowToDay(r: any): OuraDay {
   };
 }
 
-export function useHealth() {
+function useHealthState() {
   const { user } = useAuth();
   const [days, setDays] = useState<OuraDay[]>([]);
   const [connected, setConnected] = useState(false);
@@ -79,4 +80,18 @@ export function useHealth() {
   }, [days]);
 
   return { days, latest, connected, loading, spark, summary, reload };
+}
+
+type HealthValue = ReturnType<typeof useHealthState>;
+const HealthContext = createContext<HealthValue | null>(null);
+
+export function HealthProvider({ children }: { children: ReactNode }) {
+  const value = useHealthState();
+  return createElement(HealthContext.Provider, { value }, children);
+}
+
+export function useHealth(): HealthValue {
+  const ctx = useContext(HealthContext);
+  if (!ctx) throw new Error("useHealth must be used within HealthProvider");
+  return ctx;
 }
