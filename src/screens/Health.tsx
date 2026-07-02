@@ -1,5 +1,9 @@
-import { Card, StatCard, Icon, Badge } from "@/ds";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Card, StatCard, Icon, Badge, Button } from "@/ds";
 import { useHealth, type OuraDay } from "@/hooks/use-health";
+import { useAuth } from "@/contexts/AuthContext";
+import { connectOura, syncOura, disconnectOura } from "@/lib/oura";
 
 function Sparkline({ values, tone = "var(--primary-500)" }: { values: number[]; tone?: string }) {
   if (values.length < 2) return null;
@@ -23,7 +27,23 @@ function Sparkline({ values, tone = "var(--primary-500)" }: { values: number[]; 
 }
 
 export default function Health() {
-  const { days, latest, connected, loading, spark, summary } = useHealth();
+  const { days, latest, connected, loading, spark, summary, reload } = useHealth();
+  const { user } = useAuth();
+  const [syncing, setSyncing] = useState(false);
+
+  const doSync = async () => {
+    if (!user) return;
+    setSyncing(true);
+    try {
+      const rows = await syncOura();
+      toast.success(`Synced ${rows} days from Oura`);
+      await reload();
+    } catch (e) {
+      toast.error(`Sync failed: ${(e as Error).message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const metrics: {
     key: keyof OuraDay;
@@ -54,13 +74,29 @@ export default function Health() {
     <div className="pf-page" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 56px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "var(--text-primary)" }}>Health</h1>
-        {connected ? (
-          <Badge tone="success" dot>
-            Oura connected
-          </Badge>
-        ) : (
-          <Badge tone="neutral">Not connected</Badge>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {connected ? (
+            <>
+              <Badge tone="success" dot>Oura connected</Badge>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={doSync}
+                disabled={syncing}
+                leadingIcon={<Icon name="TimerProperty1Linear" size={15} style={syncing ? { animation: "pf-spin 1s linear infinite" } : undefined} />}
+              >
+                {syncing ? "Syncing…" : "Sync now"}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={async () => { if (user && confirm("Disconnect Oura?")) { await disconnectOura(user.id); await reload(); } }}>
+                Disconnect
+              </Button>
+            </>
+          ) : (
+            <Button variant="primary" size="sm" onClick={() => user && connectOura(user.id)} leadingIcon={<Icon name="AddProperty1Bold" size={15} />}>
+              Connect Oura
+            </Button>
+          )}
+        </div>
       </div>
 
       {!loading && days.length === 0 && (
@@ -81,9 +117,13 @@ export default function Health() {
             <Icon name="ChartProperty1Bold" size={24} />
           </span>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>No health data yet</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
+              {connected ? "No health data yet" : "Connect your Oura ring"}
+            </div>
             <div style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 4 }}>
-              Connect your Oura ring on the Integrations screen and your sleep, readiness and activity will sync here each morning.
+              {connected
+                ? "Tap “Sync now” above to pull your last 30 days of sleep, readiness, HRV and activity."
+                : "Tap “Connect Oura” above to link your ring — your sleep, readiness and activity then sync here."}
             </div>
           </div>
         </Card>
