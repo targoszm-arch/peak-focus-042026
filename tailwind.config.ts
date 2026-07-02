@@ -18,12 +18,23 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+				display: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+				mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
-				ring: 'hsl(var(--ring))',
+				ring: 'hsl(var(--ring-hsl))',
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
+				coral: {
+					DEFAULT: 'hsl(var(--coral))',
+					foreground: 'hsl(var(--coral-foreground))'
+				},
+				success: 'hsl(var(--success))',
+				warning: 'hsl(var(--warning))',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))'
@@ -64,9 +75,17 @@ export default {
 				}
 			},
 			borderRadius: {
+				xl: '16px',
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
+			},
+			boxShadow: {
+				'ds-xs': 'var(--shadow-xs)',
+				'ds-sm': 'var(--shadow-sm)',
+				'ds-md': 'var(--shadow-md)',
+				'ds-lg': 'var(--shadow-lg)',
+				'ds-xl': 'var(--shadow-xl)',
 			},
 			keyframes: {
 				'accordion-down': {

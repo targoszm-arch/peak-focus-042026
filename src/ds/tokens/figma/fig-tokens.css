@@ -1,0 +1,71 @@
+/* Generated from Figma Variables. First mode = :root default.
+   FLOAT tokens are unitless — multiply by 1px in calc() where a length is needed. */
+
+:root {
+  --additional-black: rgb(0,0,0); /* @kind color */
+  --additional-white: rgb(255,255,255); /* @kind color */
+  --base-default-background: var(--additional-black); /* @kind color */
+  --base-text-paragraph: rgb(111,111,111); /* @kind color */
+  --bg-surface-default: var(--neutral-0); /* @kind color */
+  --bg-surface-weak: var(--neutral-50); /* @kind color */
+  --color-tokens-border-primary: var(--globalcolors-neutral-50); /* @kind color */
+  --color-tokens-content-dark-disable: var(--globalcolors-neutral-60); /* @kind color */
+  --color-tokens-content-dark-primary: var(--globalcolors-neutral-100); /* @kind color */
+  --color-tokens-content-dark-tertiary: var(--globalcolors-neutral-70); /* @kind color */
+  --color-tokens-content-light-primary: var(--globalcolors-neutral-0); /* @kind color */
+  --color-tokens-interaction-blue-base: var(--globalcolors-blue-60); /* @kind color */
+  --color-tokens-interaction-green-base: var(--globalcolors-green-60); /* @kind color */
+  --color-tokens-interaction-orange-base: var(--globalcolors-orange-60); /* @kind color */
+  --color-tokens-interaction-primary-base: var(--globalcolors-neutral-100); /* @kind color */
+  --color-tokens-interaction-red-base: var(--globalcolors-red-60); /* @kind color */
+  --color-tokens-interaction-yellow-base: var(--globalcolors-limeyellow-60); /* @kind color */
+  --globalcolors-blue-60: rgb(73,118,244); /* @kind color */
+  --globalcolors-green-60: rgb(88,158,103); /* @kind color */
+  --globalcolors-limeyellow-60: rgb(177,171,29); /* @kind color */
+  --globalcolors-neutral-0: rgb(255,255,255); /* @kind color */
+  --globalcolors-neutral-100: rgb(0,0,0); /* @kind color */
+  --globalcolors-neutral-50: rgb(228,228,228); /* @kind color */
+  --globalcolors-neutral-60: rgb(216,216,216); /* @kind color */
+  --globalcolors-neutral-70: rgb(175,175,175); /* @kind color */
+  --globalcolors-orange-60: rgb(210,142,61); /* @kind color */
+  --globalcolors-red-60: rgb(175,75,75); /* @kind color */
+  --green-50: rgb(235,249,244); /* @kind color */
+  --green-600: rgb(51,181,134); /* @kind color */
+  --greyscale-100: rgb(223,225,231); /* @kind color */
+  --greyscale-600: rgb(54,57,74); /* @kind color */
+  --greyscale-greyscale-100: var(--greyscale-100); /* @kind color */
+  --icon-neutral-disabled: var(--neutral-300); /* @kind color */
+  --icon-neutral-main: var(--neutral-900); /* @kind color */
+  --icon-neutral-white: var(--neutral-0); /* @kind color */
+  --icon-state-error: var(--red-500); /* @kind color */
+  --icon-state-primary: var(--primary-500); /* @kind color */
+  --neutral-0: rgb(255,255,255); /* @kind color */
+  --neutral-100: rgb(239,243,248); /* @kind color */
+  --neutral-200: rgb(224,230,240); /* @kind color */
+  --neutral-300: rgb(197,207,221); /* @kind color */
+  --neutral-400: rgb(135,150,175); /* @kind color */
+  --neutral-500: rgb(89,104,129); /* @kind color */
+  --neutral-50: rgb(247,249,251); /* @kind color */
+  --neutral-600: rgb(62,74,96); /* @kind color */
+  --neutral-700: rgb(45,56,76); /* @kind color */
+  --neutral-900: rgb(17,22,37); /* @kind color */
+  --neutral-white: rgb(255,255,255); /* @kind color */
+  --primary-500: rgb(38,109,240); /* @kind color */
+  --primary-50: rgb(233,240,254); /* @kind color */
+  --red-500: rgb(223,28,65); /* @kind color */
+  --red-50: rgb(252,232,236); /* @kind color */
+  --secondary-500: rgb(241,97,60); /* @kind color */
+  --stroke-neutral-soft: var(--neutral-200); /* @kind color */
+  --stroke-state-primary: var(--primary-500); /* @kind color */
+  --text-neutral-disabled: var(--neutral-300); /* @kind color */
+  --text-neutral-main: var(--neutral-900); /* @kind color */
+  --text-neutral-white: var(--neutral-0); /* @kind color */
+  --text-state-error: var(--red-500); /* @kind color */
+  --text-state-primary: var(--primary-500); /* @kind color */
+}
+
+:root[data-theme="dark"], .dark {
+  --base-default-background: var(--additional-white); /* @kind color */
+  --base-text-paragraph: rgb(151,151,151); /* @kind color */
+  --greyscale-greyscale-100: var(--greyscale-600); /* @kind color */
+}
