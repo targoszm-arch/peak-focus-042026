@@ -16,6 +16,7 @@ import Habits from "@/screens/Habits";
 import Focus from "@/screens/Focus";
 import Health from "@/screens/Health";
 import Integrations from "@/screens/Integrations";
+import Settings from "@/screens/Settings";
 import Placeholder from "@/screens/Placeholder";
 
 const queryClient = new QueryClient();
@@ -53,10 +54,7 @@ const App = () => (
                 <Route path="focus" element={<Focus />} />
                 <Route path="health" element={<Health />} />
                 <Route path="integrations" element={<Integrations />} />
-                <Route
-                  path="settings"
-                  element={<Placeholder title="Settings" icon="Setting2Property1Linear" />}
-                />
+                <Route path="settings" element={<Settings />} />
                 <Route path="*" element={<Placeholder title="Not found" />} />
               </Route>
             </Routes>
