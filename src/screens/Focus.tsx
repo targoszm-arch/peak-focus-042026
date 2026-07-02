@@ -24,11 +24,11 @@ export default function Focus() {
   const { tasks, toggleTask } = useTasks();
   const time = useTime();
 
-  // Candidate tasks: not completed, due overdue/today/tomorrow. Most urgent first.
+  // Candidate tasks: any open task, most urgent (soonest due) first.
   const candidates = useMemo(() => {
-    const order: Record<string, number> = { overdue: 0, today: 1, tomorrow: 2 };
+    const order: Record<string, number> = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
     return tasks
-      .filter((t) => !t.completed && ["overdue", "today", "tomorrow"].includes(bucket(t.endsAt)))
+      .filter((t) => !t.completed)
       .sort((a, b) => (order[bucket(a.endsAt)] ?? 9) - (order[bucket(b.endsAt)] ?? 9));
   }, [tasks]);
 
