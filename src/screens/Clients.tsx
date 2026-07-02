@@ -67,14 +67,36 @@ const EMPTY_FORM: FormState = {
   arr: "",
 };
 
-function AddClientForm({
-  onAdd,
+function ClientForm({
+  initial,
+  onSubmit,
   onClose,
 }: {
-  onAdd: ReturnType<typeof useClients>["addClient"];
+  initial?: Client;
+  onSubmit: (patch: {
+    name: string;
+    website: string;
+    contactName: string;
+    email: string;
+    stage: string;
+    health: ClientHealth;
+    arr: number;
+  }) => void;
   onClose: () => void;
 }) {
-  const [f, setF] = useState<FormState>(EMPTY_FORM);
+  const [f, setF] = useState<FormState>(
+    initial
+      ? {
+          name: initial.name,
+          website: initial.website,
+          contactName: initial.contactName,
+          email: initial.email,
+          stage: initial.stage,
+          health: initial.health,
+          arr: initial.arr ? String(initial.arr) : "",
+        }
+      : EMPTY_FORM
+  );
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setF((s) => ({ ...s, [k]: v }));
 
@@ -82,7 +104,7 @@ function AddClientForm({
     e.preventDefault();
     const name = f.name.trim();
     if (!name) return;
-    void onAdd({
+    onSubmit({
       name,
       website: f.website.trim(),
       contactName: f.contactName.trim(),
@@ -99,7 +121,7 @@ function AddClientForm({
       <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
-            Add a client
+            {initial ? "Edit client" : "Add a client"}
           </h3>
           <button
             type="button"
@@ -159,7 +181,7 @@ function AddClientForm({
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 2 }}>
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="accent">Add client</Button>
+          <Button type="submit" variant="accent">{initial ? "Save changes" : "Add client"}</Button>
         </div>
       </form>
     </Card>
@@ -169,9 +191,11 @@ function AddClientForm({
 function ClientCard({
   client,
   onRemove,
+  onEdit,
 }: {
   client: Client;
   onRemove: (id: string) => void;
+  onEdit: (client: Client) => void;
 }) {
   const renewal = renewalLabel(client.renewal);
   const color = client.color || "#266DF0";
@@ -218,18 +242,19 @@ function ClientCard({
         </div>
         <button
           type="button"
+          onClick={() => onEdit(client)}
+          aria-label={`Edit ${client.name}`}
+          title="Edit client"
+          style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", padding: 4, flexShrink: 0 }}
+        >
+          <Icon name="EditProperty1Linear" size={15} />
+        </button>
+        <button
+          type="button"
           onClick={() => onRemove(client.id)}
           aria-label={`Remove ${client.name}`}
           title="Remove client"
-          style={{
-            border: "none",
-            background: "transparent",
-            cursor: "pointer",
-            color: "var(--text-tertiary)",
-            display: "inline-flex",
-            padding: 4,
-            flexShrink: 0,
-          }}
+          style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", padding: 4, flexShrink: 0 }}
         >
           <Icon name="TrashProperty1Linear" size={16} />
         </button>
@@ -303,11 +328,21 @@ function ClientCard({
 }
 
 export default function Clients() {
-  const { clients, loading, addClient, removeClient } = useClients();
+  const { clients, loading, addClient, updateClient, removeClient } = useClients();
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Client | null>(null);
+
+  const openEdit = (c: Client) => {
+    setEditing(c);
+    setShowForm(true);
+  };
+  const closeForm = () => {
+    setShowForm(false);
+    setEditing(null);
+  };
 
   return (
-    <div className="pf-page" style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 32px 56px" }}>
+    <div className="pf-page" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 56px" }}>
       {/* header */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
@@ -319,13 +354,23 @@ export default function Clients() {
         <Button
           variant="accent"
           leadingIcon={<Icon name="AddProperty1Bold" size={17} />}
-          onClick={() => setShowForm((s) => !s)}
+          onClick={() => (showForm && !editing ? closeForm() : (setEditing(null), setShowForm(true)))}
         >
           Add client
         </Button>
       </div>
 
-      {showForm && <AddClientForm onAdd={addClient} onClose={() => setShowForm(false)} />}
+      {showForm && (
+        <ClientForm
+          initial={editing ?? undefined}
+          onSubmit={(patch) => {
+            if (editing) void updateClient(editing.id, patch);
+            else void addClient(patch);
+            closeForm();
+          }}
+          onClose={closeForm}
+        />
+      )}
 
       {clients.length === 0 && !loading ? (
         <Card padding={40} style={{ marginTop: 20, textAlign: "center" }}>
@@ -346,7 +391,7 @@ export default function Clients() {
           }}
         >
           {clients.map((c) => (
-            <ClientCard key={c.id} client={c} onRemove={removeClient} />
+            <ClientCard key={c.id} client={c} onRemove={removeClient} onEdit={openEdit} />
           ))}
         </div>
       )}

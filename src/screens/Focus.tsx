@@ -24,11 +24,11 @@ export default function Focus() {
   const { tasks, toggleTask } = useTasks();
   const time = useTime();
 
-  // Candidate tasks: not completed, due overdue/today/tomorrow. Most urgent first.
+  // Candidate tasks: any open task, most urgent (soonest due) first.
   const candidates = useMemo(() => {
-    const order: Record<string, number> = { overdue: 0, today: 1, tomorrow: 2 };
+    const order: Record<string, number> = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
     return tasks
-      .filter((t) => !t.completed && ["overdue", "today", "tomorrow"].includes(bucket(t.endsAt)))
+      .filter((t) => !t.completed)
       .sort((a, b) => (order[bucket(a.endsAt)] ?? 9) - (order[bucket(b.endsAt)] ?? 9));
   }, [tasks]);
 
@@ -116,7 +116,7 @@ export default function Focus() {
   const addToQueue = (id: string) => setQueue((q) => (q.includes(id) ? q : [...q, id]));
 
   return (
-    <div className="pf-page" style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 32px 56px" }}>
+    <div className="pf-page" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 56px" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "var(--text-primary)" }}>Focus</h1>

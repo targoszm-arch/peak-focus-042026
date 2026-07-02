@@ -5,7 +5,32 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { TasksProvider } from "@/hooks/use-tasks";
+import { HabitsProvider } from "@/hooks/use-habits";
+import { ProjectsProvider } from "@/hooks/use-projects";
+import { ClientsProvider } from "@/hooks/use-clients";
+import { PeopleProvider } from "@/hooks/use-people";
+import { TimeProvider } from "@/hooks/use-time";
+import { HealthProvider } from "@/hooks/use-health";
 import SignIn from "@/pages/SignIn";
+
+function DataProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <TasksProvider>
+      <ProjectsProvider>
+        <ClientsProvider>
+          <PeopleProvider>
+            <HabitsProvider>
+              <TimeProvider>
+                <HealthProvider>{children}</HealthProvider>
+              </TimeProvider>
+            </HabitsProvider>
+          </PeopleProvider>
+        </ClientsProvider>
+      </ProjectsProvider>
+    </TasksProvider>
+  );
+}
 import Dashboard from "@/screens/Dashboard";
 import Today from "@/screens/Today";
 import Tasks from "@/screens/Tasks";
@@ -42,6 +67,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthGate>
+            <DataProviders>
             <Routes>
               <Route element={<AppLayout />}>
                 <Route index element={<Dashboard />} />
@@ -58,6 +84,7 @@ const App = () => (
                 <Route path="*" element={<Placeholder title="Not found" />} />
               </Route>
             </Routes>
+            </DataProviders>
           </AuthGate>
         </BrowserRouter>
       </TooltipProvider>

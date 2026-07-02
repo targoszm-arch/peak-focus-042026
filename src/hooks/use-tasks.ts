@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -150,7 +159,7 @@ async function migrateLocalStorageOnce(userId: string) {
   localStorage.setItem(MIGRATED_FLAG, "1");
 }
 
-export function useTasks() {
+function useTasksState() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -403,4 +412,18 @@ export function useTasks() {
     stats,
     projectStats,
   };
+}
+
+type TasksValue = ReturnType<typeof useTasksState>;
+const TasksContext = createContext<TasksValue | null>(null);
+
+export function TasksProvider({ children }: { children: ReactNode }) {
+  const value = useTasksState();
+  return createElement(TasksContext.Provider, { value }, children);
+}
+
+export function useTasks(): TasksValue {
+  const ctx = useContext(TasksContext);
+  if (!ctx) throw new Error("useTasks must be used within TasksProvider");
+  return ctx;
 }

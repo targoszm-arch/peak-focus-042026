@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { createContext, createElement, useContext, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -31,7 +32,7 @@ function rowToPerson(r: any): Person {
   };
 }
 
-export function usePeople() {
+function usePeopleState() {
   const { user } = useAuth();
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,4 +95,18 @@ export function usePeople() {
   }, []);
 
   return { people, loading, addPerson, updatePerson, removePerson, reload };
+}
+
+type PeopleValue = ReturnType<typeof usePeopleState>;
+const PeopleContext = createContext<PeopleValue | null>(null);
+
+export function PeopleProvider({ children }: { children: ReactNode }) {
+  const value = usePeopleState();
+  return createElement(PeopleContext.Provider, { value }, children);
+}
+
+export function usePeople(): PeopleValue {
+  const ctx = useContext(PeopleContext);
+  if (!ctx) throw new Error("usePeople must be used within PeopleProvider");
+  return ctx;
 }

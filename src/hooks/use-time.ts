@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, createElement, useContext, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -33,7 +34,7 @@ function startOfWeek(d: Date): Date {
   return x;
 }
 
-export function useTime() {
+function useTimeState() {
   const { user } = useAuth();
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -132,6 +133,20 @@ export function useTime() {
   }, [entries, now]);
 
   return { entries, running, loading, start, stop, durationOf, stats, now, reload };
+}
+
+type TimeValue = ReturnType<typeof useTimeState>;
+const TimeContext = createContext<TimeValue | null>(null);
+
+export function TimeProvider({ children }: { children: ReactNode }) {
+  const value = useTimeState();
+  return createElement(TimeContext.Provider, { value }, children);
+}
+
+export function useTime(): TimeValue {
+  const ctx = useContext(TimeContext);
+  if (!ctx) throw new Error("useTime must be used within TimeProvider");
+  return ctx;
 }
 
 export function fmtDuration(ms: number): string {

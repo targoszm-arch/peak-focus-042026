@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { createContext, createElement, useContext, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -57,7 +58,7 @@ function toRow(c: NewClient) {
   };
 }
 
-export function useClients() {
+function useClientsState() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,4 +110,18 @@ export function useClients() {
   }, []);
 
   return { clients, loading, addClient, updateClient, removeClient, reload };
+}
+
+type ClientsValue = ReturnType<typeof useClientsState>;
+const ClientsContext = createContext<ClientsValue | null>(null);
+
+export function ClientsProvider({ children }: { children: ReactNode }) {
+  const value = useClientsState();
+  return createElement(ClientsContext.Provider, { value }, children);
+}
+
+export function useClients(): ClientsValue {
+  const ctx = useContext(ClientsContext);
+  if (!ctx) throw new Error("useClients must be used within ClientsProvider");
+  return ctx;
 }

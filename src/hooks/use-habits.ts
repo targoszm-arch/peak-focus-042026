@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -164,7 +173,7 @@ async function migrateHabitsLocalOnce(userId: string) {
   localStorage.setItem(HABITS_MIGRATED_FLAG, "1");
 }
 
-export function useHabits() {
+function useHabitsState() {
   const { user } = useAuth();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [entries, setEntries] = useState<Record<string, DailyEntry>>({});
@@ -486,4 +495,18 @@ export function useHabits() {
     monthlyStats,
     currentStreak,
   };
+}
+
+type HabitsValue = ReturnType<typeof useHabitsState>;
+const HabitsContext = createContext<HabitsValue | null>(null);
+
+export function HabitsProvider({ children }: { children: ReactNode }) {
+  const value = useHabitsState();
+  return createElement(HabitsContext.Provider, { value }, children);
+}
+
+export function useHabits(): HabitsValue {
+  const ctx = useContext(HabitsContext);
+  if (!ctx) throw new Error("useHabits must be used within HabitsProvider");
+  return ctx;
 }
