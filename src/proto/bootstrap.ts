@@ -1,6 +1,7 @@
 // Bridges the Peak Focus design-system prototype to the app: it exposes React
 // and the DS component namespace (the exact `window.PeakFocusDesignSystem_2ecfec`
 // the screens read) so the *unmodified* prototype screens run in the Vite build.
+import "./proto.css";
 import React from "react";
 import {
   Icon, Button, IconButton, Input, Select, Checkbox, Radio, Switch,

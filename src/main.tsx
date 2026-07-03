@@ -4,7 +4,7 @@ import App from './App.tsx'
 import './index.css'
 import { lazy, Suspense } from 'react'
 
-const ProtoProof = lazy(() => import('./proto/ProtoProof'))
+const ProtoProof = lazy(() => import('./proto/ProtoApp'))
 const isProto = window.location.pathname === '/proto'
 
 createRoot(document.getElementById("root")!).render(
