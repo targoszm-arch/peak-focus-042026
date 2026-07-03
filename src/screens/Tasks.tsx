@@ -56,7 +56,7 @@ export default function Tasks() {
             </Card>
           );
         })}
-        {tasks.length === 0 && (
+        {rootTasks.length === 0 && (
           <div style={{ padding: "18px 4px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
             No tasks yet — add your first above.
           </div>
