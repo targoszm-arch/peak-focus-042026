@@ -1,317 +1,193 @@
-import { useState } from "react";
-import { Card, Button, Icon, Avatar, Badge } from "@/ds";
+import { useMemo, useState } from "react";
+import { Icon, Avatar, Badge } from "@/ds";
 import { usePeople, type TeamRole, type Person } from "@/hooks/use-people";
+import { useTasks, INBOX_ID } from "@/hooks/use-tasks";
+import { ModalShell } from "@/components/pf/modals";
 
-const ROLE_TONE: Record<TeamRole, "primary" | "neutral"> = {
-  Admin: "primary",
-  User: "neutral",
-  Viewer: "neutral",
-};
+/* People — teammate directory cards with role, contact, workload (open tasks
+   + projects from task assignments) and a full add/edit modal. Ported from
+   the design system's PeopleScreen. */
 
 const TEAM_ROLES: TeamRole[] = ["Admin", "User", "Viewer"];
+const roleTone: Record<TeamRole, "primary" | "neutral" | "accent"> = {
+  Admin: "primary",
+  User: "neutral",
+  Viewer: "accent",
+};
 
+const fieldLabel: React.CSSProperties = {
+  display: "block", fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 700,
+  textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-tertiary)", marginBottom: 7,
+};
 const inputStyle: React.CSSProperties = {
-  width: "100%",
-  height: 42,
-  padding: "0 12px",
-  borderRadius: "var(--radius-md)",
-  border: "1px solid var(--border-strong)",
-  background: "var(--surface-card)",
-  fontFamily: "var(--font-sans)",
-  fontSize: 14,
-  color: "var(--text-primary)",
-  outline: "none",
-  boxSizing: "border-box",
+  width: "100%", height: 42, padding: "0 12px", borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border-strong)", background: "var(--surface-card)",
+  fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text-primary)",
+  outline: "none", boxSizing: "border-box",
 };
 
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontFamily: "var(--font-sans)",
-  fontSize: 11.5,
-  fontWeight: 700,
-  textTransform: "uppercase",
-  letterSpacing: ".05em",
-  color: "var(--text-tertiary)",
-  marginBottom: 7,
-};
+function PersonModal({ member, onClose }: { member: Person | null; onClose: () => void }) {
+  const { addPerson, updatePerson, removePerson } = usePeople();
+  const isNew = !member;
+  const [f, setF] = useState(() => ({
+    name: member?.name ?? "",
+    role: member?.role ?? "",
+    email: member?.email ?? "",
+    teamRole: (member?.teamRole ?? "User") as TeamRole,
+  }));
+  const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
-function AddPersonForm({
-  onAdd,
-  onClose,
-}: {
-  onAdd: (p: { name: string; role: string; email: string; teamRole: TeamRole }) => void;
-  onClose: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [role, setRole] = useState("");
-  const [email, setEmail] = useState("");
-  const [teamRole, setTeamRole] = useState<TeamRole>("User");
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    onAdd({ name: trimmed, role: role.trim(), email: email.trim(), teamRole });
+  const save = async () => {
+    const n = f.name.trim();
+    if (!n) return;
+    if (isNew) await addPerson({ ...f, name: n });
+    else await updatePerson(member.id, { ...f, name: n });
     onClose();
   };
 
+  const ghost: React.CSSProperties = { height: 40, padding: "0 16px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 700, color: "var(--text-secondary)" };
+  const primary: React.CSSProperties = { height: 40, padding: "0 18px", borderRadius: "var(--radius-md)", border: "none", background: "var(--primary-500)", color: "#fff", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 700 };
+
   return (
-    <Card padding={20} style={{ marginTop: 16 }}>
-      <form onSubmit={submit}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 14,
-          }}
-        >
-          <div>
-            <label style={labelStyle}>Full name</label>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Sana Okafor"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Role / title</label>
-            <input
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              placeholder="e.g. Designer"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Access</label>
-            <select
-              value={teamRole}
-              onChange={(e) => setTeamRole(e.target.value as TeamRole)}
-              style={{ ...inputStyle, cursor: "pointer" }}
-            >
-              {TEAM_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="accent" disabled={!name.trim()}>
-            Add person
-          </Button>
-        </div>
-      </form>
-    </Card>
-  );
-}
-
-function PersonRow({
-  person,
-  onRemove,
-}: {
-  person: Person;
-  onRemove: (id: string) => void;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        padding: "12px 16px",
-        borderBottom: "1px solid var(--border-soft)",
-        minWidth: 520,
-      }}
-    >
-      {/* person */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
-        <Avatar name={person.name} size={40} style={{ background: person.color }} />
-        <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: 14,
-              fontWeight: 700,
-              color: "var(--text-primary)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+    <ModalShell title={isNew ? "Add person" : "Edit person"} icon={isNew ? "AddProperty1Bold" : "EditProperty1Linear"} width={500} onClose={onClose} footer={
+      <>
+        {!isNew && (
+          <button
+            onClick={() => {
+              if (window.confirm(`Remove "${member.name}" from your team?`)) {
+                void removePerson(member.id);
+                onClose();
+              }
             }}
+            style={{ ...ghost, color: "var(--red-500)", display: "inline-flex", alignItems: "center", gap: 6 }}
           >
-            {person.name}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              fontFamily: "var(--font-sans)",
-              fontSize: 12.5,
-              color: "var(--text-tertiary)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {person.email ? (
-              <>
-                <Icon name="SmsProperty1Linear" size={13} /> {person.email}
-              </>
-            ) : (
-              "no email yet"
-            )}
-          </div>
+            <Icon name="TrashProperty1Linear" size={15} /> Remove
+          </button>
+        )}
+        <span style={{ flex: 1 }} />
+        <button onClick={onClose} style={ghost}>Cancel</button>
+        <button onClick={save} style={primary}>{isNew ? "Add person" : "Save changes"}</button>
+      </>
+    }>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <Avatar name={f.name || "?"} size={52} />
+        <div style={{ flex: 1 }}>
+          <label style={fieldLabel}>Full name</label>
+          <input autoFocus value={f.name} onChange={(e) => set("name", e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void save(); }} style={inputStyle} placeholder="e.g. Sana Okafor" />
         </div>
       </div>
-
-      {/* role */}
-      <div
-        className="pf-hide-narrow"
-        style={{
-          width: 160,
-          flexShrink: 0,
-          fontFamily: "var(--font-sans)",
-          fontSize: 13,
-          color: "var(--text-secondary)",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {person.role || "—"}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 180px" }}>
+          <label style={fieldLabel}>Role / title</label>
+          <input value={f.role} onChange={(e) => set("role", e.target.value)} style={inputStyle} placeholder="e.g. Designer" />
+        </div>
+        <div style={{ flex: "1 1 140px" }}>
+          <label style={fieldLabel}>Access</label>
+          <select value={f.teamRole} onChange={(e) => set("teamRole", e.target.value as TeamRole)} style={{ ...inputStyle, cursor: "pointer" }}>
+            {TEAM_ROLES.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
       </div>
-
-      {/* access */}
-      <div style={{ width: 84, flexShrink: 0, display: "flex", justifyContent: "flex-start" }}>
-        <Badge tone={ROLE_TONE[person.teamRole]}>{person.teamRole}</Badge>
+      <div>
+        <label style={fieldLabel}>Email</label>
+        <input type="email" value={f.email} onChange={(e) => set("email", e.target.value)} style={inputStyle} placeholder="name@company.com" />
       </div>
-
-      {/* remove */}
-      <button
-        onClick={() => onRemove(person.id)}
-        title={`Remove ${person.name}`}
-        aria-label={`Remove ${person.name}`}
-        style={{
-          width: 32,
-          height: 32,
-          flexShrink: 0,
-          borderRadius: "var(--radius-sm)",
-          border: "none",
-          background: "transparent",
-          cursor: "pointer",
-          color: "var(--text-tertiary)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--status-danger)")}
-        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-tertiary)")}
-      >
-        <Icon name="TrashProperty1Linear" size={17} />
-      </button>
-    </div>
+    </ModalShell>
   );
 }
 
 export default function People() {
-  const { people, loading, addPerson, removePerson } = usePeople();
-  const [adding, setAdding] = useState(false);
+  const { people, loading } = usePeople();
+  const { rootTasks, assigneesByTask } = useTasks();
+  const [query, setQuery] = useState("");
+  const [modal, setModal] = useState<{ member: Person | null } | null>(null);
+
+  // Workload per person, from task assignments.
+  const workload = useMemo(() => {
+    const map = new Map<string, { open: number; projects: Set<string> }>();
+    for (const t of rootTasks) {
+      for (const pid of assigneesByTask[t.id] ?? []) {
+        const w = map.get(pid) ?? { open: 0, projects: new Set<string>() };
+        if (!t.completed) w.open += 1;
+        if (t.projectId !== INBOX_ID) w.projects.add(t.projectId);
+        map.set(pid, w);
+      }
+    }
+    return map;
+  }, [rootTasks, assigneesByTask]);
+
+  const q = query.trim().toLowerCase();
+  const list = people.filter(
+    (p) => !q || p.name.toLowerCase().includes(q) || p.role.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)
+  );
 
   return (
-    <div className="pf-page" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 56px" }}>
-      {/* header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          gap: 16,
-          flexWrap: "wrap",
-        }}
-      >
+    <div className="pf-page" style={{ width: "100%", maxWidth: 1200, margin: "0 auto", boxSizing: "border-box", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
+      <style>{`.pf-ppl-grid{display:grid;grid-template-columns:1fr;gap:14px;} @media (min-width:620px){ .pf-ppl-grid{grid-template-columns:repeat(2,1fr);} } @media (min-width:1080px){ .pf-ppl-grid{grid-template-columns:repeat(3,1fr);} }`}</style>
+
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "var(--text-primary)" }}>
-            People
-          </h1>
-          <p style={{ margin: "6px 0 0", fontSize: 14, color: "var(--text-secondary)" }}>
-            {people.length === 0
-              ? "The teammates you can assign work to live here."
-              : `${people.length} ${people.length === 1 ? "teammate" : "teammates"} you can assign work to.`}
+          <h1 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>People</h1>
+          <p style={{ margin: "5px 0 0", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text-secondary)" }}>
+            {people.length} teammate{people.length === 1 ? "" : "s"} you assign work to
           </p>
         </div>
-        <Button
-          variant="accent"
-          leadingIcon={<Icon name="AddProperty1Bold" size={17} />}
-          onClick={() => setAdding((v) => !v)}
-        >
-          Add person
-        </Button>
+        <button onClick={() => setModal({ member: null })} style={{ display: "inline-flex", alignItems: "center", gap: 7, height: 40, padding: "0 16px", borderRadius: "var(--radius-md)", border: "none", background: "var(--primary-500)", color: "#fff", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 700, boxShadow: "var(--shadow-sm)", flexShrink: 0 }}>
+          <Icon name="AddProperty1Bold" size={17} /> Add person
+        </button>
       </div>
 
-      {adding && <AddPersonForm onAdd={addPerson} onClose={() => setAdding(false)} />}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, height: 42, padding: "0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)" }}>
+        <Icon name="SearchNormalProperty1Linear" size={17} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, role or email" style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text-primary)" }} />
+      </div>
 
-      {/* body */}
-      <div style={{ marginTop: 16 }}>
-        {loading ? (
-          <Card padding={28} style={{ textAlign: "center", color: "var(--text-tertiary)" }}>
-            Loading your team…
-          </Card>
-        ) : people.length === 0 ? (
-          <Card padding={28} style={{ textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-            No teammates yet — add people so you can assign them to tasks.
-          </Card>
-        ) : (
-          <Card padding={0} style={{ overflow: "hidden" }}>
-            <div className="pf-hscroll" style={{ overflowX: "auto" }}>
-              {/* column header */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  padding: "10px 16px",
-                  minWidth: 520,
-                  background: "var(--surface-sunken)",
-                  borderBottom: "1px solid var(--border-soft)",
-                  fontFamily: "var(--font-sans)",
-                  fontSize: 11.5,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: ".05em",
-                  color: "var(--text-tertiary)",
-                }}
-              >
-                <span style={{ flex: 1, minWidth: 0 }}>Person</span>
-                <span className="pf-hide-narrow" style={{ width: 160, flexShrink: 0 }}>
-                  Role
-                </span>
-                <span style={{ width: 84, flexShrink: 0 }}>Access</span>
-                <span style={{ width: 32, flexShrink: 0 }} />
+      <div className="pf-ppl-grid">
+        {list.map((p) => {
+          const w = workload.get(p.id);
+          return (
+            <div key={p.id} style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <Avatar name={p.name} size={46} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "var(--font-sans)", fontSize: 15.5, fontWeight: 700, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                  <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-secondary)" }}>{p.role || "—"}</div>
+                </div>
+                <button
+                  onClick={() => setModal({ member: p })}
+                  title="Edit person"
+                  style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+                >
+                  <Icon name="EditProperty1Linear" size={17} />
+                </button>
               </div>
-              {people.map((p) => (
-                <PersonRow key={p.id} person={p} onRemove={removePerson} />
-              ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--font-sans)", fontSize: 12.5, color: "var(--text-tertiary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <Icon name="SmsProperty1Linear" size={14} />
+                {p.email ? <a href={`mailto:${p.email}`} style={{ color: "var(--text-tertiary)", textDecoration: "none" }}>{p.email}</a> : "—"}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 12, borderTop: "1px solid var(--border-soft)" }}>
+                <Badge tone={roleTone[p.teamRole] ?? "neutral"}>{p.teamRole}</Badge>
+                <span style={{ flex: 1 }} />
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)" }}>
+                  <Icon name="TaskSquareProperty1Linear" size={14} /> {w?.open ?? 0} open
+                </span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)" }}>
+                  <Icon name="FolderProperty1Linear" size={14} /> {w?.projects.size ?? 0}
+                </span>
+              </div>
             </div>
-          </Card>
+          );
+        })}
+        {list.length === 0 && (
+          <div style={{ gridColumn: "1 / -1", padding: 40, textAlign: "center", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text-tertiary)" }}>
+            {loading ? "Loading people…" : q ? "No people match this search." : "No teammates yet — add someone above, then assign them from a task's edit panel."}
+          </div>
         )}
       </div>
+
+      {modal && <PersonModal member={modal.member} onClose={() => setModal(null)} />}
     </div>
   );
 }

@@ -16,7 +16,7 @@ function greeting() {
 
 export default function Today() {
   const { user } = useAuth();
-  const { tasks, stats } = useTasks();
+  const { rootTasks: tasks, stats } = useTasks();
   const { habits, todayEntry, toggleHabit, currentStreak, weeklyCounts } = useHabits();
 
   const name =

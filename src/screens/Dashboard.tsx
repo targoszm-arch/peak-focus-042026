@@ -211,7 +211,7 @@ function UrgentTasks({ tasks, onToggle }: { tasks: Task[]; onToggle: (id: string
 }
 
 export default function Dashboard() {
-  const { tasks, toggleTask, stats } = useTasks();
+  const { rootTasks: tasks, toggleTask, stats } = useTasks();
   const { projects } = useProjects();
 
   const completionRate = stats.total ? Math.round((stats.completed / stats.total) * 100) : 0;

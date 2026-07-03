@@ -15,17 +15,17 @@ const GROUPS: { key: Bucket | "done"; title: string }[] = [
 ];
 
 export default function Tasks() {
-  const { tasks, stats } = useTasks();
+  const { rootTasks, stats } = useTasks();
 
   const grouped = useMemo(() => {
     const map: Record<string, Task[]> = {};
     for (const g of GROUPS) map[g.key] = [];
-    for (const t of tasks) {
+    for (const t of rootTasks) {
       if (t.completed) map.done.push(t);
       else map[bucket(t.endsAt)].push(t);
     }
     return map;
-  }, [tasks]);
+  }, [rootTasks]);
 
   return (
     <div className="pf-page" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 56px" }}>
@@ -56,7 +56,7 @@ export default function Tasks() {
             </Card>
           );
         })}
-        {tasks.length === 0 && (
+        {rootTasks.length === 0 && (
           <div style={{ padding: "18px 4px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
             No tasks yet — add your first above.
           </div>

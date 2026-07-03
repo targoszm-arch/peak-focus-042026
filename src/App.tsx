@@ -12,6 +12,7 @@ import { ClientsProvider } from "@/hooks/use-clients";
 import { PeopleProvider } from "@/hooks/use-people";
 import { TimeProvider } from "@/hooks/use-time";
 import { HealthProvider } from "@/hooks/use-health";
+import { FocusQueueProvider } from "@/hooks/use-focus-queue";
 import SignIn from "@/pages/SignIn";
 
 function DataProviders({ children }: { children: React.ReactNode }) {
@@ -22,7 +23,9 @@ function DataProviders({ children }: { children: React.ReactNode }) {
           <PeopleProvider>
             <HabitsProvider>
               <TimeProvider>
-                <HealthProvider>{children}</HealthProvider>
+                <HealthProvider>
+                  <FocusQueueProvider>{children}</FocusQueueProvider>
+                </HealthProvider>
               </TimeProvider>
             </HabitsProvider>
           </PeopleProvider>
@@ -35,6 +38,7 @@ import Dashboard from "@/screens/Dashboard";
 import Today from "@/screens/Today";
 import Tasks from "@/screens/Tasks";
 import Projects from "@/screens/Projects";
+import ProjectDetail from "@/screens/ProjectDetail";
 import Clients from "@/screens/Clients";
 import People from "@/screens/People";
 import Habits from "@/screens/Habits";
@@ -74,6 +78,7 @@ const App = () => (
                 <Route path="today" element={<Today />} />
                 <Route path="tasks" element={<Tasks />} />
                 <Route path="projects" element={<Projects />} />
+                <Route path="projects/:id" element={<ProjectDetail />} />
                 <Route path="clients" element={<Clients />} />
                 <Route path="people" element={<People />} />
                 <Route path="habits" element={<Habits />} />

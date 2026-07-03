@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Icon, Checkbox } from "@/ds";
-import { useTasks, type Task } from "@/hooks/use-tasks";
+import { useTasks, INBOX_ID, type Task } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
+import { useFocusQueue } from "@/hooks/use-focus-queue";
 import { bucket, label as dueLabelFor } from "@/lib/pfdate";
 import { PRIORITY_LABEL, PRIORITY_TOKEN, DUE_PRESETS, dueFromPreset } from "./pf-helpers";
+import { TaskEditModal } from "./modals";
 
 type Menu = "project" | "priority" | "due" | null;
 
@@ -16,9 +19,15 @@ export default function TaskRow({
   showProject?: boolean;
   dense?: boolean;
 }) {
-  const { toggleTask, updateTaskFields, removeTask } = useTasks();
+  const { toggleTask, updateTaskFields, removeTask, checklistStats } = useTasks();
   const { projects } = useProjects();
+  const focus = useFocusQueue();
+  const navigate = useNavigate();
   const [menu, setMenu] = useState<Menu>(null);
+  const [editing, setEditing] = useState(false);
+  const sub = checklistStats(task.id);
+  const canOpen = task.projectId !== INBOX_ID;
+  const queued = focus.has(task.id);
 
   useEffect(() => {
     if (!menu) return;
@@ -82,6 +91,8 @@ export default function TaskRow({
 
   return (
     <div
+      onClick={() => { if (canOpen) navigate(`/projects/${task.projectId}`); }}
+      title={canOpen ? "Open project" : undefined}
       style={{
         display: "flex",
         alignItems: "center",
@@ -92,6 +103,7 @@ export default function TaskRow({
         border: "1px solid var(--border-soft)",
         transition: "border-color .15s, box-shadow .15s",
         opacity: task.completed ? 0.6 : 1,
+        cursor: canOpen ? "pointer" : "default",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.boxShadow = "var(--shadow-sm)";
@@ -102,9 +114,12 @@ export default function TaskRow({
         e.currentTarget.style.borderColor = "var(--border-soft)";
       }}
     >
-      <Checkbox checked={task.completed} onChange={() => toggleTask(task.id)} />
+      <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex" }}>
+        <Checkbox checked={task.completed} onChange={() => toggleTask(task.id)} />
+      </span>
 
       <span
+        onClickCapture={(e) => e.stopPropagation()}
         contentEditable
         suppressContentEditableWarning
         spellCheck={false}
@@ -149,6 +164,20 @@ export default function TaskRow({
       >
         {task.title}
       </span>
+
+      {/* checklist progress */}
+      {sub.total > 0 && (
+        <span
+          title={`${sub.done}/${sub.total} checklist steps done`}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0,
+            fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 700,
+            color: sub.done === sub.total ? "var(--status-success, #2A9E75)" : "var(--text-tertiary)",
+          }}
+        >
+          <Icon name="TaskSquareProperty1Bold" size={13} /> {sub.done}/{sub.total}
+        </span>
+      )}
 
       {/* project */}
       {showProject && (
@@ -224,8 +253,33 @@ export default function TaskRow({
         )}
       </span>
 
-      {/* delete */}
-      <span onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
+      {/* row actions: add-to-focus, edit, delete */}
+      <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+        {!task.completed && (
+          <button
+            onClick={() => (queued ? focus.remove(task.id) : focus.add(task.id))}
+            title={queued ? "In focus queue — remove" : "Add to focus"}
+            style={{
+              ...trigger, padding: "3px 4px",
+              background: queued ? "var(--primary-50, #E8F0FE)" : "transparent",
+              color: queued ? "var(--primary-500)" : "var(--text-tertiary)",
+            }}
+            onMouseEnter={(e) => { if (!queued) e.currentTarget.style.color = "var(--primary-500)"; }}
+            onMouseLeave={(e) => { if (!queued) e.currentTarget.style.color = "var(--text-tertiary)"; }}
+          >
+            <Icon name="TimerProperty1Bold" size={15} />
+          </button>
+        )}
+        <button
+          onClick={() => setEditing(true)}
+          title="Edit task — checklist, notes, dates"
+          aria-label={`Edit task ${task.title}`}
+          style={{ ...trigger, padding: "3px 4px", color: "var(--text-tertiary)" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+        >
+          <Icon name="EditProperty1Linear" size={15} />
+        </button>
         <button
           onClick={() => {
             if (window.confirm(`Delete "${task.title}"?`)) removeTask(task.id);
@@ -239,6 +293,12 @@ export default function TaskRow({
           <Icon name="TrashProperty1Linear" size={15} />
         </button>
       </span>
+
+      {editing && (
+        <span onClick={(e) => e.stopPropagation()}>
+          <TaskEditModal task={task} onClose={() => setEditing(false)} />
+        </span>
+      )}
     </div>
   );
 }
