@@ -62,7 +62,7 @@ export default function TaskRow({
   const menuBox: React.CSSProperties = {
     position: "absolute",
     top: "calc(100% + 6px)",
-    right: 0,
+    left: 0,
     zIndex: 40,
     background: "var(--surface-card)",
     border: "1px solid var(--border-soft)",
@@ -89,15 +89,15 @@ export default function TaskRow({
     background: sel ? "var(--surface-sunken)" : "transparent",
   });
 
+  /* Two stacked rows on a shared grid: row 1 = checkbox + task name,
+     row 2 = meta chips + actions (in the name's column), so a long name
+     never fights the actions line for horizontal space. */
   return (
     <div
       onClick={() => { if (canOpen) navigate(`/projects/${task.projectId}`); }}
       title={canOpen ? "Open project" : undefined}
+      className={`grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 ${dense ? "px-3 py-2" : "px-3.5 py-3"}`}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: dense ? "9px 12px" : "12px 14px",
         background: "var(--surface-card)",
         borderRadius: "var(--radius-md)",
         border: "1px solid var(--border-soft)",
@@ -114,7 +114,8 @@ export default function TaskRow({
         e.currentTarget.style.borderColor = "var(--border-soft)";
       }}
     >
-      <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex" }}>
+      {/* row 1 — checkbox + name */}
+      <span onClick={(e) => e.stopPropagation()} className="inline-flex pt-px">
         <Checkbox checked={task.completed} onChange={() => toggleTask(task.id)} />
       </span>
 
@@ -135,167 +136,161 @@ export default function TaskRow({
         }}
         onFocus={(e) => {
           e.currentTarget.style.background = "var(--surface-sunken)";
-          e.currentTarget.style.whiteSpace = "normal";
         }}
         onBlur={(e) => {
           e.currentTarget.style.background = "transparent";
-          e.currentTarget.style.whiteSpace = "nowrap";
           const v = e.currentTarget.textContent?.trim() ?? "";
           if (v && v !== task.title) updateTaskFields(task.id, { title: v });
           else e.currentTarget.textContent = task.title;
         }}
+        className="min-w-0 cursor-text whitespace-normal break-words outline-none"
         style={{
-          flex: 1,
-          minWidth: 0,
           fontFamily: "var(--font-sans)",
           fontSize: 14,
           fontWeight: 500,
+          lineHeight: 1.45,
           color: "var(--text-primary)",
           textDecoration: task.completed ? "line-through" : "none",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          outline: "none",
           borderRadius: "var(--radius-sm)",
-          padding: "2px 4px",
-          margin: "-2px -4px",
-          cursor: "text",
+          padding: "1px 4px",
+          margin: "-1px -4px",
         }}
       >
         {task.title}
       </span>
 
-      {/* checklist progress */}
-      {sub.total > 0 && (
-        <span
-          title={`${sub.done}/${sub.total} checklist steps done`}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0,
-            fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 700,
-            color: sub.done === sub.total ? "var(--status-success, #2A9E75)" : "var(--text-tertiary)",
-          }}
-        >
-          <Icon name="TaskSquareProperty1Bold" size={13} /> {sub.done}/{sub.total}
-        </span>
-      )}
-
-      {/* project */}
-      {showProject && (
-        <span onClick={(e) => e.stopPropagation()} style={{ position: "relative", flexShrink: 0 }}>
-          <button
-            onClick={() => setMenu(menu === "project" ? null : "project")}
-            title="Change project"
-            style={{ ...trigger, fontSize: 12, color: "var(--text-secondary)", maxWidth: 140 }}
+      {/* row 2 — meta chips + actions, aligned under the name */}
+      <div className="col-start-2 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1">
+        {/* checklist progress */}
+        {sub.total > 0 && (
+          <span
+            title={`${sub.done}/${sub.total} checklist steps done`}
+            className="inline-flex shrink-0 items-center gap-1"
+            style={{
+              fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 700,
+              color: sub.done === sub.total ? "var(--status-success, #2A9E75)" : "var(--text-tertiary)",
+            }}
           >
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: tag.color, flexShrink: 0 }} />
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{tag.name}</span>
-          </button>
-          {menu === "project" && (
-            <div style={menuBox}>
-              <div style={menuItem(task.projectId === "inbox")} onClick={() => set({ projectId: "inbox" })}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#8796AF" }} /> Chores
+            <Icon name="TaskSquareProperty1Bold" size={13} /> {sub.done}/{sub.total}
+          </span>
+        )}
+
+        {/* project */}
+        {showProject && (
+          <span onClick={(e) => e.stopPropagation()} className="relative shrink-0">
+            <button
+              onClick={() => setMenu(menu === "project" ? null : "project")}
+              title="Change project"
+              style={{ ...trigger, fontSize: 12, color: "var(--text-secondary)", maxWidth: 150 }}
+            >
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: tag.color, flexShrink: 0 }} />
+              <span className="overflow-hidden text-ellipsis">{tag.name}</span>
+            </button>
+            {menu === "project" && (
+              <div style={menuBox}>
+                <div style={menuItem(task.projectId === "inbox")} onClick={() => set({ projectId: "inbox" })}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#8796AF" }} /> Chores
+                </div>
+                {projects.map((p) => (
+                  <div key={p.id} style={menuItem(task.projectId === p.id)} onClick={() => set({ projectId: p.id })}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color }} /> {p.name}
+                  </div>
+                ))}
               </div>
-              {projects.map((p) => (
-                <div key={p.id} style={menuItem(task.projectId === p.id)} onClick={() => set({ projectId: p.id })}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.color }} /> {p.name}
+            )}
+          </span>
+        )}
+
+        {/* priority */}
+        <span onClick={(e) => e.stopPropagation()} className="relative shrink-0">
+          <button
+            onClick={() => setMenu(menu === "priority" ? null : "priority")}
+            title="Change priority"
+            style={{ ...trigger, color: `var(${prTone})`, padding: "3px 4px" }}
+          >
+            <Icon name="FlagProperty1Bold" size={15} />
+          </button>
+          {menu === "priority" && (
+            <div style={menuBox}>
+              {(["high", "medium", "low"] as const).map((p) => (
+                <div key={p} style={menuItem(task.priority === p)} onClick={() => set({ priority: p })}>
+                  <Icon name="FlagProperty1Bold" size={14} style={{ color: `var(${PRIORITY_TOKEN[p]})` }} /> {PRIORITY_LABEL[p]}
                 </div>
               ))}
             </div>
           )}
         </span>
-      )}
 
-      {/* priority */}
-      <span onClick={(e) => e.stopPropagation()} style={{ position: "relative", flexShrink: 0 }}>
-        <button
-          onClick={() => setMenu(menu === "priority" ? null : "priority")}
-          title="Change priority"
-          style={{ ...trigger, color: `var(${prTone})`, padding: "3px 4px" }}
-        >
-          <Icon name="FlagProperty1Bold" size={15} />
-        </button>
-        {menu === "priority" && (
-          <div style={menuBox}>
-            {(["high", "medium", "low"] as const).map((p) => (
-              <div key={p} style={menuItem(task.priority === p)} onClick={() => set({ priority: p })}>
-                <Icon name="FlagProperty1Bold" size={14} style={{ color: `var(${PRIORITY_TOKEN[p]})` }} /> {PRIORITY_LABEL[p]}
-              </div>
-            ))}
-          </div>
-        )}
-      </span>
-
-      {/* due */}
-      <span onClick={(e) => e.stopPropagation()} style={{ position: "relative", flexShrink: 0 }}>
-        <button
-          onClick={() => setMenu(menu === "due" ? null : "due")}
-          title="Set date"
-          style={{
-            ...trigger,
-            gap: 5,
-            minWidth: 74,
-            justifyContent: "flex-end",
-            fontSize: 12,
-            fontWeight: 600,
-            color: overdue ? "var(--red-500)" : "var(--text-tertiary)",
-          }}
-        >
-          <Icon name="CalendarProperty1Linear" size={13} /> {dueLabelFor(task.endsAt)}
-        </button>
-        {menu === "due" && (
-          <div style={menuBox}>
-            {DUE_PRESETS.map(([k, l]) => (
-              <div key={k} style={menuItem(false)} onClick={() => set({ endsAt: dueFromPreset(k) })}>
-                <Icon name="CalendarProperty1Linear" size={14} style={{ color: "var(--text-tertiary)" }} /> {l}
-              </div>
-            ))}
-          </div>
-        )}
-      </span>
-
-      {/* row actions: add-to-focus, edit, delete */}
-      <span onClick={(e) => e.stopPropagation()} style={{ display: "inline-flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-        {!task.completed && (
+        {/* due */}
+        <span onClick={(e) => e.stopPropagation()} className="relative shrink-0">
           <button
-            onClick={() => (queued ? focus.remove(task.id) : focus.add(task.id))}
-            title={queued ? "In focus queue — remove" : "Add to focus"}
+            onClick={() => setMenu(menu === "due" ? null : "due")}
+            title="Set date"
             style={{
-              ...trigger, padding: "3px 4px",
-              background: queued ? "var(--primary-50, #E8F0FE)" : "transparent",
-              color: queued ? "var(--primary-500)" : "var(--text-tertiary)",
+              ...trigger,
+              gap: 5,
+              fontSize: 12,
+              fontWeight: 600,
+              color: overdue ? "var(--red-500)" : "var(--text-tertiary)",
             }}
-            onMouseEnter={(e) => { if (!queued) e.currentTarget.style.color = "var(--primary-500)"; }}
-            onMouseLeave={(e) => { if (!queued) e.currentTarget.style.color = "var(--text-tertiary)"; }}
           >
-            <Icon name="TimerProperty1Bold" size={15} />
+            <Icon name="CalendarProperty1Linear" size={13} /> {dueLabelFor(task.endsAt)}
           </button>
-        )}
-        <button
-          onClick={() => setEditing(true)}
-          title="Edit task — checklist, notes, dates"
-          aria-label={`Edit task ${task.title}`}
-          style={{ ...trigger, padding: "3px 4px", color: "var(--text-tertiary)" }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
-        >
-          <Icon name="EditProperty1Linear" size={15} />
-        </button>
-        <button
-          onClick={() => {
-            if (window.confirm(`Delete "${task.title}"?`)) removeTask(task.id);
-          }}
-          title="Delete task"
-          aria-label={`Delete task ${task.title}`}
-          style={{ ...trigger, padding: "3px 4px", color: "var(--text-tertiary)" }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red-500)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
-        >
-          <Icon name="TrashProperty1Linear" size={15} />
-        </button>
-      </span>
+          {menu === "due" && (
+            <div style={menuBox}>
+              {DUE_PRESETS.map(([k, l]) => (
+                <div key={k} style={menuItem(false)} onClick={() => set({ endsAt: dueFromPreset(k) })}>
+                  <Icon name="CalendarProperty1Linear" size={14} style={{ color: "var(--text-tertiary)" }} /> {l}
+                </div>
+              ))}
+            </div>
+          )}
+        </span>
+
+        {/* actions: add-to-focus, edit, delete — pushed to the row's end */}
+        <span onClick={(e) => e.stopPropagation()} className="ml-auto inline-flex shrink-0 items-center gap-0.5">
+          {!task.completed && (
+            <button
+              onClick={() => (queued ? focus.remove(task.id) : focus.add(task.id))}
+              title={queued ? "In focus queue — remove" : "Add to focus"}
+              style={{
+                ...trigger, padding: "3px 4px",
+                background: queued ? "var(--primary-50, #E8F0FE)" : "transparent",
+                color: queued ? "var(--primary-500)" : "var(--text-tertiary)",
+              }}
+              onMouseEnter={(e) => { if (!queued) e.currentTarget.style.color = "var(--primary-500)"; }}
+              onMouseLeave={(e) => { if (!queued) e.currentTarget.style.color = "var(--text-tertiary)"; }}
+            >
+              <Icon name="TimerProperty1Bold" size={15} />
+            </button>
+          )}
+          <button
+            onClick={() => setEditing(true)}
+            title="Edit task — checklist, notes, dates"
+            aria-label={`Edit task ${task.title}`}
+            style={{ ...trigger, padding: "3px 4px", color: "var(--text-tertiary)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+          >
+            <Icon name="EditProperty1Linear" size={15} />
+          </button>
+          <button
+            onClick={() => {
+              if (window.confirm(`Delete "${task.title}"?`)) removeTask(task.id);
+            }}
+            title="Delete task"
+            aria-label={`Delete task ${task.title}`}
+            style={{ ...trigger, padding: "3px 4px", color: "var(--text-tertiary)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red-500)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+          >
+            <Icon name="TrashProperty1Linear" size={15} />
+          </button>
+        </span>
+      </div>
 
       {editing && (
-        <span onClick={(e) => e.stopPropagation()}>
+        <span onClick={(e) => e.stopPropagation()} className="contents">
           <TaskEditModal task={task} onClose={() => setEditing(false)} />
         </span>
       )}
