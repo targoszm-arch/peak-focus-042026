@@ -89,7 +89,8 @@ export function ModalShell({
         style={{
           width: width || 520,
           maxWidth: "94vw",
-          maxHeight: "82vh",
+          // Shrinks with the on-screen keyboard (--pf-vvh) so fields stay reachable.
+          maxHeight: "min(82vh, calc(var(--pf-vvh, 100vh) - 13vh))",
           display: "flex",
           flexDirection: "column",
           background: "var(--surface-card)",
