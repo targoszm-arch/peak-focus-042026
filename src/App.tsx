@@ -2,8 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import AppLayout from "./layouts/AppLayout";
+import { BrowserRouter } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { TasksProvider } from "@/hooks/use-tasks";
 import { HabitsProvider } from "@/hooks/use-habits";
@@ -13,6 +12,9 @@ import { PeopleProvider } from "@/hooks/use-people";
 import { TimeProvider } from "@/hooks/use-time";
 import { HealthProvider } from "@/hooks/use-health";
 import SignIn from "@/pages/SignIn";
+import ProtoAppLive from "@/proto/ProtoAppLive";
+
+const queryClient = new QueryClient();
 
 function DataProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -31,22 +33,8 @@ function DataProviders({ children }: { children: React.ReactNode }) {
     </TasksProvider>
   );
 }
-import Dashboard from "@/screens/Dashboard";
-import Today from "@/screens/Today";
-import Tasks from "@/screens/Tasks";
-import Projects from "@/screens/Projects";
-import Clients from "@/screens/Clients";
-import People from "@/screens/People";
-import Habits from "@/screens/Habits";
-import Focus from "@/screens/Focus";
-import Health from "@/screens/Health";
-import Integrations from "@/screens/Integrations";
-import Settings from "@/screens/Settings";
-import Placeholder from "@/screens/Placeholder";
 
-const queryClient = new QueryClient();
-
-function AuthGate({ children }: { children: React.ReactNode }) {
+function AuthGate() {
   const { user, loading } = useAuth();
   if (loading) {
     return (
@@ -56,7 +44,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <SignIn />;
-  return <>{children}</>;
+  return (
+    <DataProviders>
+      <ProtoAppLive />
+    </DataProviders>
+  );
 }
 
 const App = () => (
@@ -66,26 +58,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AuthGate>
-            <DataProviders>
-            <Routes>
-              <Route element={<AppLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="today" element={<Today />} />
-                <Route path="tasks" element={<Tasks />} />
-                <Route path="projects" element={<Projects />} />
-                <Route path="clients" element={<Clients />} />
-                <Route path="people" element={<People />} />
-                <Route path="habits" element={<Habits />} />
-                <Route path="focus" element={<Focus />} />
-                <Route path="health" element={<Health />} />
-                <Route path="integrations" element={<Integrations />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="*" element={<Placeholder title="Not found" />} />
-              </Route>
-            </Routes>
-            </DataProviders>
-          </AuthGate>
+          <AuthGate />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

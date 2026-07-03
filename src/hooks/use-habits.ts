@@ -370,6 +370,45 @@ function useHabitsState() {
     [habits]
   );
 
+  const setHabitDay = useCallback(
+    async (key: HabitKey, dateISO: string, done: boolean) => {
+      if (!user) return;
+      const habit = habits.find((h) => h.key === key);
+      if (!habit) return;
+      setEntries((prev) => {
+        const e = prev[dateISO] ?? blankEntry(dateISO);
+        return { ...prev, [dateISO]: { ...e, habits: { ...e.habits, [key]: done } } };
+      });
+      if (done) {
+        await supabase.from("habit_logs").upsert(
+          { user_id: user.id, habit_id: habit.id, log_date: dateISO, done: true },
+          { onConflict: "user_id,habit_id,log_date" }
+        );
+      } else {
+        await supabase
+          .from("habit_logs")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("habit_id", habit.id)
+          .eq("log_date", dateISO);
+      }
+    },
+    [user, habits]
+  );
+
+  const updateHabitFields = useCallback(
+    async (key: HabitKey, patch: { label?: string; emoji?: string }) => {
+      const habit = habits.find((h) => h.key === key);
+      if (!habit) return;
+      setHabits((prev) => prev.map((h) => (h.key === key ? { ...h, ...patch } : h)));
+      const row: Record<string, unknown> = {};
+      if (patch.label !== undefined) row.label = patch.label;
+      if (patch.emoji !== undefined) row.emoji = patch.emoji;
+      await supabase.from("habits").update(row).eq("id", habit.id);
+    },
+    [habits]
+  );
+
   const weeklyCounts = useMemo(() => {
     const start = startOfWeek(new Date());
     const counts: Record<HabitKey, number> = {};
@@ -380,6 +419,33 @@ function useHabitsState() {
       for (const h of habits) if (e.habits[h.key]) counts[h.key] += 1;
     }
     return counts;
+  }, [entries, habits]);
+
+  // Per-habit booleans for the current week (Mon..Sun) + consecutive-day streaks.
+  const weekGrids = useMemo(() => {
+    const start = startOfWeek(new Date());
+    const grids: Record<HabitKey, boolean[]> = {};
+    for (const h of habits) {
+      grids[h.key] = Array.from({ length: 7 }, (_, i) => {
+        const e = entries[todayKey(addDays(start, i))];
+        return !!e?.habits[h.key];
+      });
+    }
+    return grids;
+  }, [entries, habits]);
+
+  const habitStreaks = useMemo(() => {
+    const streaks: Record<HabitKey, number> = {};
+    for (const h of habits) {
+      let n = 0;
+      for (let i = 0; i < 365; i++) {
+        const e = entries[todayKey(addDays(new Date(), -i))];
+        if (e?.habits[h.key]) n += 1;
+        else break;
+      }
+      streaks[h.key] = n;
+    }
+    return streaks;
   }, [entries, habits]);
 
   const last7Days = useMemo(() => {
@@ -489,7 +555,11 @@ function useHabitsState() {
     addHabit,
     removeHabit,
     updateHabitTarget,
+    updateHabitFields,
+    setHabitDay,
     weeklyCounts,
+    weekGrids,
+    habitStreaks,
     last7Days,
     monthMatrix,
     monthlyStats,
