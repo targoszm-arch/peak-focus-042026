@@ -16,7 +16,7 @@ export default function TaskRow({
   showProject?: boolean;
   dense?: boolean;
 }) {
-  const { toggleTask, updateTaskFields } = useTasks();
+  const { toggleTask, updateTaskFields, removeTask } = useTasks();
   const { projects } = useProjects();
   const [menu, setMenu] = useState<Menu>(null);
 
@@ -152,13 +152,14 @@ export default function TaskRow({
 
       {/* project */}
       {showProject && (
-        <span onClick={(e) => e.stopPropagation()} style={{ position: "relative", flexShrink: 0 }} className="pf-hide-narrow">
+        <span onClick={(e) => e.stopPropagation()} style={{ position: "relative", flexShrink: 0 }}>
           <button
             onClick={() => setMenu(menu === "project" ? null : "project")}
             title="Change project"
-            style={{ ...trigger, fontSize: 12, color: "var(--text-secondary)" }}
+            style={{ ...trigger, fontSize: 12, color: "var(--text-secondary)", maxWidth: 140 }}
           >
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: tag.color }} /> {tag.name}
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: tag.color, flexShrink: 0 }} />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{tag.name}</span>
           </button>
           {menu === "project" && (
             <div style={menuBox}>
@@ -221,6 +222,22 @@ export default function TaskRow({
             ))}
           </div>
         )}
+      </span>
+
+      {/* delete */}
+      <span onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
+        <button
+          onClick={() => {
+            if (window.confirm(`Delete "${task.title}"?`)) removeTask(task.id);
+          }}
+          title="Delete task"
+          aria-label={`Delete task ${task.title}`}
+          style={{ ...trigger, padding: "3px 4px", color: "var(--text-tertiary)" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red-500)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+        >
+          <Icon name="TrashProperty1Linear" size={15} />
+        </button>
       </span>
     </div>
   );
