@@ -13,6 +13,7 @@ import { PeopleProvider } from "@/hooks/use-people";
 import { TimeProvider } from "@/hooks/use-time";
 import { HealthProvider } from "@/hooks/use-health";
 import { FocusQueueProvider } from "@/hooks/use-focus-queue";
+import { useKeyboardSnapback } from "@/hooks/use-keyboard-snapback";
 import SignIn from "@/pages/SignIn";
 
 function DataProviders({ children }: { children: React.ReactNode }) {
@@ -52,6 +53,7 @@ const queryClient = new QueryClient();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  useKeyboardSnapback();
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
