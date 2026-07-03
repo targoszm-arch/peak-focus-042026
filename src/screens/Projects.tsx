@@ -1,209 +1,225 @@
-import { useState } from "react";
-import { Card, Button, Icon, Badge, ProgressBar, Input } from "@/ds";
-import { useProjects, type ProjectStatus, type ProjectFull } from "@/hooks/use-projects";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Icon, ProgressBar, AvatarGroup } from "@/ds";
+import { useProjects, type ProjectFull } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
-import { useTasks } from "@/hooks/use-tasks";
-import { label as dueLabel } from "@/lib/pfdate";
+import { useTasks, INBOX_ID, type Task } from "@/hooks/use-tasks";
+import { usePeople } from "@/hooks/use-people";
+import { label as dueLabel, bucket } from "@/lib/pfdate";
+import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
+import { KanbanView, TimelineView, CalendarView } from "@/components/pf/ProjectViews";
 
-const STATUS_TONE: Record<ProjectStatus, "primary" | "success" | "warning" | "neutral"> = {
-  active: "primary",
-  done: "success",
-  on_hold: "warning",
-  archived: "neutral",
-};
-const STATUS_LABEL: Record<ProjectStatus, string> = {
-  active: "active",
-  done: "done",
-  on_hold: "on hold",
-  archived: "archived",
-};
-const STATUSES: ProjectStatus[] = ["active", "on_hold", "done", "archived"];
+/* Projects — grouped directory (My Projects · Favourites · Finished) with
+   search, star-to-favourite, and Board / Timeline / Calendar views across all
+   project tasks. Ported from the design system's ProjectsScreen. */
 
-const selectStyle: React.CSSProperties = {
-  flex: "1 1 150px",
-  minWidth: 140,
-  height: 42,
-  padding: "0 12px",
-  background: "var(--surface-card)",
-  border: "1px solid var(--border-soft)",
-  borderRadius: "var(--radius-md)",
-  fontFamily: "var(--font-sans)",
-  fontSize: 14,
-  color: "var(--text-primary)",
-  cursor: "pointer",
-};
+type ViewKey = "list" | "board" | "timeline" | "calendar";
+const VIEW_KEY = "pf.projects.view";
+const STAR_KEY = "pf.projects.starred";
+const COL_KEY = "pf.projects.collapsed";
+
+const SECTIONS = {
+  visible: { tint: "var(--primary-500)", strong: "var(--primary-700, #1D50AF)", icon: "FolderProperty1Bold", label: "My Projects" },
+  favourites: { tint: "var(--yellow-500, #E6A609)", strong: "#B47D06", icon: "StarProperty1Bold", label: "Favourites" },
+  finished: { tint: "var(--green-600, #2A9E75)", strong: "#1F7757", icon: "TickCircleProperty1Bold", label: "Finished" },
+} as const;
+type SectionKey = keyof typeof SECTIONS;
 
 export default function Projects() {
-  const { projects, addProject, updateProject, removeProject } = useProjects();
+  const navigate = useNavigate();
+  const { projects } = useProjects();
   const { clients } = useClients();
-  const { projectStats } = useTasks();
+  const { rootTasks, projectStats, assigneesByTask } = useTasks();
+  const { people } = usePeople();
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [clientId, setClientId] = useState<string>("");
-  const [due, setDue] = useState("");
-  const [status, setStatus] = useState<ProjectStatus>("active");
+  const [view, setView] = useState<ViewKey>(() => {
+    try { return (localStorage.getItem(VIEW_KEY) as ViewKey) || "list"; } catch { return "list"; }
+  });
+  const setV = (v: ViewKey) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } };
 
-  const reset = () => {
-    setName("");
-    setClientId("");
-    setDue("");
-    setStatus("active");
-    setEditingId(null);
-    setFormOpen(false);
+  const [starred, setStarred] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(STAR_KEY) || "[]")); } catch { return new Set(); }
+  });
+  const toggleStar = (id: string) =>
+    setStarred((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem(STAR_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem(COL_KEY) || "{}"); } catch { return {}; }
+  });
+  const toggleSec = (k: SectionKey) =>
+    setCollapsed((prev) => {
+      const next = { ...prev, [k]: !prev[k] };
+      try { localStorage.setItem(COL_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+
+  const [query, setQuery] = useState("");
+  const [projModal, setProjModal] = useState<{ project: ProjectFull | null } | null>(null);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+
+  const clientById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
+  const projectTasks = useMemo(() => rootTasks.filter((t) => t.projectId !== INBOX_ID), [rootTasks]);
+
+  const stat = (pid: string) => {
+    const s = projectStats[pid] ?? { total: 0, completed: 0, remaining: 0 };
+    const pct = s.total ? Math.round((s.completed / s.total) * 100) : 0;
+    const list = projectTasks.filter((t) => t.projectId === pid);
+    const openDue = list.filter((t) => !t.completed && ["overdue", "today"].includes(bucket(t.endsAt))).length;
+    const ids = new Set<string>();
+    for (const t of list) for (const a of assigneesByTask[t.id] ?? []) ids.add(a);
+    const team = people.filter((p) => ids.has(p.id));
+    return { ...s, pct, openDue, team };
   };
 
-  const openNew = () => {
-    reset();
-    setFormOpen(true);
-  };
-  const openEdit = (p: ProjectFull) => {
-    setEditingId(p.id);
-    setName(p.name);
-    setClientId(p.clientId ?? "");
-    setDue(p.due ?? "");
-    setStatus(p.status);
-    setFormOpen(true);
+  const q = query.trim().toLowerCase();
+  const match = (p: ProjectFull) =>
+    !q ||
+    p.name.toLowerCase().includes(q) ||
+    (clientById.get(p.clientId ?? "")?.name ?? "").toLowerCase().includes(q);
+
+  const withStat = projects.map((p) => ({ ...p, s: stat(p.id) }));
+  const finished = withStat.filter((p) => ((p.s.total > 0 && p.s.pct === 100) || p.status === "done") && match(p));
+  const finishedIds = new Set(finished.map((p) => p.id));
+  const visible = withStat.filter((p) => !finishedIds.has(p.id) && match(p));
+  const favourites = visible.filter((p) => starred.has(p.id));
+
+  const projectRow = (p: (typeof withStat)[number], sec: SectionKey) => {
+    const c = clientById.get(p.clientId ?? "");
+    const color = c?.color ?? p.color;
+    const s = p.s;
+    const isStar = starred.has(p.id);
+    const cfg = SECTIONS[sec];
+    return (
+      <button
+        key={sec + "-" + p.id}
+        onClick={() => navigate(`/projects/${p.id}`)}
+        style={{
+          display: "flex", alignItems: "center", gap: 13, width: "100%", textAlign: "left",
+          cursor: "pointer", padding: "11px 12px", borderRadius: "var(--radius-md)",
+          border: "1px solid transparent", background: "transparent",
+          transition: "background .13s, border-color .13s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = `color-mix(in srgb, ${cfg.tint} 8%, white)`; e.currentTarget.style.borderColor = `color-mix(in srgb, ${cfg.tint} 20%, var(--border-soft))`; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "transparent"; }}
+      >
+        <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: "var(--radius-md)", background: `color-mix(in srgb, ${color} 15%, white)`, color, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 800 }}>
+          {(c?.name ?? p.name).slice(0, 1).toUpperCase()}
+        </span>
+        <span style={{ minWidth: 0, flex: "1 1 200px", display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 700, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+          <span style={{ fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c?.name ?? "No client"}</span>
+        </span>
+        <span style={{ flex: "0 1 150px", minWidth: 96, display: "none", flexDirection: "column", gap: 5 }} className="pf-proj-progress">
+          <span style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
+            <span>{s.completed}/{s.total}</span>
+            <span>{s.pct}%</span>
+          </span>
+          <ProgressBar value={s.pct} height={6} tone={s.pct === 100 ? "success" : "primary"} />
+        </span>
+        <span style={{ flexShrink: 0, display: "none", alignItems: "center", gap: 5, fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, color: s.openDue > 0 ? "var(--red-500)" : "var(--text-tertiary)" }} className="pf-proj-due">
+          <Icon name="CalendarProperty1Linear" size={13} /> {dueLabel(p.due)}
+        </span>
+        <span style={{ flexShrink: 0, display: "none" }} className="pf-proj-team">
+          {s.team.length > 0 && <AvatarGroup users={s.team.map((a) => ({ name: a.name }))} size={24} max={3} />}
+        </span>
+        <span
+          role="button"
+          title={isStar ? "Remove from favourites" : "Add to favourites"}
+          onClick={(e) => { e.stopPropagation(); toggleStar(p.id); }}
+          style={{ flexShrink: 0, width: 30, height: 30, borderRadius: "var(--radius-sm)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: isStar ? "var(--yellow-500, #E6A609)" : "var(--text-tertiary)" }}
+        >
+          <Icon name={isStar ? "StarProperty1Bold" : "StarProperty1Linear"} size={17} />
+        </span>
+      </button>
+    );
   };
 
-  const submit = async () => {
-    if (!name.trim()) return;
-    const patch = { name: name.trim(), clientId: clientId || null, due: due || null, status };
-    if (editingId) await updateProject(editingId, patch);
-    else await addProject(patch);
-    reset();
+  const section = (key: SectionKey, list: typeof withStat, emptyText: string) => {
+    const cfg = SECTIONS[key];
+    const isCollapsed = !!collapsed[key];
+    return (
+      <div style={{
+        borderRadius: "var(--radius-xl)", padding: 8,
+        border: `1px solid color-mix(in srgb, ${cfg.tint} 18%, var(--border-soft))`,
+        background: `linear-gradient(180deg, color-mix(in srgb, ${cfg.tint} 6%, white) 0%, var(--surface-card) 70%)`,
+      }}>
+        <button onClick={() => toggleSec(key)} aria-expanded={!isCollapsed} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 10, padding: "7px 8px", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+            <Icon name={cfg.icon} size={17} style={{ color: cfg.tint }} />
+            <span style={{ fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{cfg.label}</span>
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+            <span style={{ minWidth: 26, height: 21, padding: "0 7px", borderRadius: "var(--radius-full)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 700, color: cfg.strong, border: `1px solid color-mix(in srgb, ${cfg.tint} 30%, white)`, background: `color-mix(in srgb, ${cfg.tint} 13%, white)` }}>{list.length}</span>
+            <Icon name="ArrowDownProperty1Linear" size={15} style={{ color: "var(--text-tertiary)", transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform .2s" }} />
+          </span>
+        </button>
+        {!isCollapsed && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>
+            {list.length > 0
+              ? list.map((p) => projectRow(p, key))
+              : <div style={{ padding: "10px 12px", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-tertiary)" }}>{emptyText}</div>}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
-    <div className="pf-page" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 56px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+    <div className="pf-page" style={{ width: "100%", maxWidth: 1200, margin: "0 auto", boxSizing: "border-box", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
+      <style>{`@media (min-width: 720px){ .pf-proj-progress{display:flex !important;} } @media (min-width: 860px){ .pf-proj-due{display:inline-flex !important;} } @media (min-width: 980px){ .pf-proj-team{display:inline-flex !important;} }`}</style>
+
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "var(--text-primary)" }}>Projects</h1>
-          <p style={{ margin: "6px 0 0", fontSize: 14, color: "var(--text-secondary)" }}>
-            Group your tasks into projects and watch each one climb.
+          <h1 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Projects</h1>
+          <p style={{ margin: "5px 0 0", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text-secondary)" }}>
+            {projects.length} project{projects.length === 1 ? "" : "s"} across {clients.length} client{clients.length === 1 ? "" : "s"}
           </p>
         </div>
-        <Button variant="accent" leadingIcon={<Icon name="AddProperty1Bold" size={16} />} onClick={formOpen && !editingId ? reset : openNew}>
-          New project
-        </Button>
+        <button onClick={() => setProjModal({ project: null })} style={{ display: "inline-flex", alignItems: "center", gap: 7, height: 40, padding: "0 16px", borderRadius: "var(--radius-md)", border: "none", background: "var(--primary-500)", color: "#fff", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 700, boxShadow: "var(--shadow-sm)", flexShrink: 0 }}>
+          <Icon name="AddProperty1Bold" size={17} /> New project
+        </button>
       </div>
 
-      {formOpen && (
-        <Card padding={18} style={{ marginTop: 18 }}>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
-            <div style={{ flex: "2 1 220px", minWidth: 200 }}>
-              <Input
-                autoFocus
-                placeholder="Project name"
-                value={name}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
-                onKeyDown={(e: React.KeyboardEvent) => {
-                  if (e.key === "Enter") void submit();
-                  if (e.key === "Escape") reset();
-                }}
-              />
-            </div>
-            <select value={clientId} onChange={(e) => setClientId(e.target.value)} style={{ ...selectStyle, color: clientId ? "var(--text-primary)" : "var(--text-tertiary)" }}>
-              <option value="">No client</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <div style={{ flex: "1 1 150px", minWidth: 140 }}>
-              <Input type="date" value={due} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDue(e.target.value)} />
-            </div>
-            <select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)} style={selectStyle}>
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-              ))}
-            </select>
-            <Button variant="primary" onClick={() => void submit()}>{editingId ? "Save" : "Add"}</Button>
-            <Button variant="ghost" onClick={reset}>Cancel</Button>
-          </div>
-        </Card>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, height: 42, padding: "0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)" }}>
+        <Icon name="SearchNormalProperty1Linear" size={17} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search for a project or client" style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text-primary)" }} />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: 4, background: "var(--surface-sunken, var(--surface-page))", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", alignSelf: "flex-start", flexWrap: "wrap" }}>
+        {([["list", "List", "FolderProperty1Linear"], ["board", "Board", "Element3Property1Linear"], ["timeline", "Timeline", "ChartProperty1Linear"], ["calendar", "Calendar", "CalendarProperty1Linear"]] as [ViewKey, string, string][]).map(([k, l, ic]) => (
+          <button key={k} onClick={() => setV(k)} style={{
+            display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 13px",
+            borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
+            fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700,
+            background: view === k ? "var(--surface-card)" : "transparent",
+            color: view === k ? "var(--text-primary)" : "var(--text-secondary)",
+            boxShadow: view === k ? "var(--shadow-sm)" : "none",
+            transition: "background .12s, color .12s",
+          }}>
+            <Icon name={ic} size={15} /> {l}
+          </button>
+        ))}
+      </div>
+
+      {view === "board" && <KanbanView tasks={projectTasks} onOpen={setEditTask} />}
+      {view === "timeline" && <TimelineView tasks={projectTasks} onOpen={setEditTask} />}
+      {view === "calendar" && <CalendarView tasks={projectTasks} />}
+
+      {view === "list" && (
+        <>
+          {section("visible", visible, q ? "No projects match this search." : "No active projects — create your first one above.")}
+          {section("favourites", favourites, "No starred projects yet — tap the star on any project.")}
+          {section("finished", finished, "No finished projects yet.")}
+        </>
       )}
 
-      {projects.length === 0 ? (
-        <Card padding={28} style={{ marginTop: 22, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-          No projects yet — group your tasks into a project to track progress.
-        </Card>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginTop: 22 }}>
-          {projects.map((p) => {
-            const client = p.clientId ? clients.find((c) => c.id === p.clientId) : undefined;
-            const stats = projectStats[p.id] ?? { total: 0, completed: 0, remaining: 0 };
-            const pct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-            return (
-              <Card key={p.id} padding={18} hover>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: "50%", background: p.color, flexShrink: 0, marginTop: 4 }} />
-                  <button
-                    onClick={() => openEdit(p)}
-                    title="Edit project"
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      textAlign: "left",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      fontFamily: "var(--font-display)",
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: "var(--text-primary)",
-                      padding: 0,
-                    }}
-                  >
-                    {p.name}
-                  </button>
-                  <button onClick={() => openEdit(p)} aria-label="Edit project" style={iconBtn}>
-                    <Icon name="EditProperty1Linear" size={15} />
-                  </button>
-                  <button onClick={() => void removeProject(p.id)} aria-label="Delete project" style={iconBtn}>
-                    <Icon name="TrashProperty1Linear" size={16} />
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
-                  {client && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: client.color }} />
-                      {client.name}
-                    </span>
-                  )}
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, color: "var(--text-tertiary)" }}>
-                    <Icon name="CalendarProperty1Linear" size={13} /> {dueLabel(p.due)}
-                  </span>
-                </div>
-
-                <div style={{ marginTop: 16 }}>
-                  <ProgressBar value={pct} tone="primary" />
-                  <div style={{ marginTop: 8, fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, color: "var(--text-tertiary)" }}>
-                    {stats.completed} of {stats.total} tasks done
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 14 }}>
-                  <Badge tone={STATUS_TONE[p.status]} dot>{STATUS_LABEL[p.status]}</Badge>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      {projModal && <ProjectEditModal project={projModal.project} onClose={() => setProjModal(null)} />}
+      {editTask && <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />}
     </div>
   );
 }
-
-const iconBtn: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "transparent",
-  border: "none",
-  color: "var(--text-tertiary)",
-  cursor: "pointer",
-  flexShrink: 0,
-  padding: 2,
-};
