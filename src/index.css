@@ -100,6 +100,15 @@
   }
 }
 
+/* iOS Safari auto-zooms the whole page when a focused form control's
+   font-size is below 16px, and the zoom sticks after the keyboard closes
+   (viewport stays enlarged/scrolled). Force ≥16px on touch devices;
+   !important so it also beats the inline fontSize styles used across
+   screens. Desktop keeps the smaller design sizes. */
+@media (hover: none) and (pointer: coarse) {
+  input, select, textarea { font-size: 16px !important; }
+}
+
 @keyframes pf-pop { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes pf-spin { to { transform: rotate(360deg); } }
 
