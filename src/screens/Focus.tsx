@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, Button, Icon, Checkbox, Badge, IconButton } from "@/ds";
 import { useTasks, type Task } from "@/hooks/use-tasks";
 import { useTime } from "@/hooks/use-time";
+import { useFocusQueue } from "@/hooks/use-focus-queue";
 import { bucket, label as dueLabel } from "@/lib/pfdate";
 
 const FOCUS_SECS = 25 * 60;
@@ -21,26 +22,17 @@ const PRIORITY_TONE: Record<string, "danger" | "primary" | "neutral"> = {
 };
 
 export default function Focus() {
-  const { tasks, toggleTask } = useTasks();
+  const { tasks, rootTasks, toggleTask } = useTasks();
   const time = useTime();
+  const { queue, setQueue } = useFocusQueue();
 
   // Candidate tasks: any open task, most urgent (soonest due) first.
   const candidates = useMemo(() => {
     const order: Record<string, number> = { overdue: 0, today: 1, tomorrow: 2, week: 3, later: 4 };
-    return tasks
+    return rootTasks
       .filter((t) => !t.completed)
       .sort((a, b) => (order[bucket(a.endsAt)] ?? 9) - (order[bucket(b.endsAt)] ?? 9));
-  }, [tasks]);
-
-  // Focus queue — task ids. Seed from the first 3 candidates once.
-  const [queue, setQueue] = useState<string[]>([]);
-  const seeded = useRef(false);
-  useEffect(() => {
-    if (seeded.current) return;
-    if (candidates.length === 0) return;
-    seeded.current = true;
-    setQueue(candidates.slice(0, 3).map((t) => t.id));
-  }, [candidates]);
+  }, [rootTasks]);
 
   // Drop any queued ids that no longer resolve to an open task.
   useEffect(() => {
@@ -48,7 +40,7 @@ export default function Focus() {
       const next = prev.filter((id) => tasks.some((t) => t.id === id && !t.completed));
       return next.length === prev.length ? prev : next;
     });
-  }, [tasks]);
+  }, [tasks, setQueue]);
 
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t] as const)), [tasks]);
   const queuedTasks = queue.map((id) => byId.get(id)).filter(Boolean) as Task[];

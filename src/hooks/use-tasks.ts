@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export type Priority = "high" | "medium" | "low" | "none";
 export type TimeOfDay = "anytime" | "morning" | "afternoon" | "evening" | "at_time";
 export type Repeat = "none" | "daily" | "weekdays" | "weekly" | "monthly";
+export type TaskStatus = "todo" | "progress" | "review" | "done";
 
 export type Task = {
   id: string;
@@ -23,6 +24,7 @@ export type Task = {
   completedAt: number | null;
   projectId: string; // INBOX_ID or a project id
   priority: Priority;
+  status: TaskStatus;
   startsAt: string | null; // ISO
   endsAt: string | null; // ISO
   timeOfDay: TimeOfDay;
@@ -35,6 +37,7 @@ export type NewTaskInput = {
   title: string;
   projectId?: string;
   priority?: Priority;
+  status?: TaskStatus;
   startsAt?: string | null;
   endsAt?: string | null;
   timeOfDay?: TimeOfDay;
@@ -75,6 +78,7 @@ type DBTask = {
   title: string;
   completed: boolean;
   priority: Priority;
+  status: TaskStatus | null;
   project_id: string | null;
   created_at: string;
   completed_at: string | null;
@@ -96,6 +100,7 @@ function dbToTask(row: DBTask): Task {
     completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
     projectId: row.project_id ?? INBOX_ID,
     priority: row.priority,
+    status: row.status ?? (row.completed ? "done" : "todo"),
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     timeOfDay: row.time_of_day ?? "anytime",
@@ -163,14 +168,16 @@ function useTasksState() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [assigneesByTask, setAssigneesByTask] = useState<Record<string, string[]>>({});
 
   const reload = useCallback(async () => {
     if (!user) {
       setTasks([]);
       setProjects([]);
+      setAssigneesByTask({});
       return;
     }
-    const [{ data: t }, { data: p }] = await Promise.all([
+    const [{ data: t }, { data: p }, { data: a }] = await Promise.all([
       supabase
         .from("tasks")
         .select("*")
@@ -181,9 +188,18 @@ function useTasksState() {
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: true }),
+      supabase
+        .from("task_assignees")
+        .select("task_id, person_id")
+        .eq("user_id", user.id),
     ]);
     setTasks((t ?? []).map(dbToTask));
     setProjects((p ?? []).map(dbToProject));
+    const map: Record<string, string[]> = {};
+    for (const row of (a ?? []) as { task_id: string; person_id: string }[]) {
+      (map[row.task_id] ??= []).push(row.person_id);
+    }
+    setAssigneesByTask(map);
   }, [user]);
 
   useEffect(() => {
@@ -211,6 +227,7 @@ function useTasksState() {
           user_id: user.id,
           title: t,
           priority: input.priority ?? "none",
+          status: input.status ?? "todo",
           project_id: pid === INBOX_ID ? null : pid,
           starts_at: input.startsAt ?? null,
           ends_at: input.endsAt ?? null,
@@ -240,6 +257,14 @@ function useTasksState() {
       if (patch.priority !== undefined) {
         dbPatch.priority = patch.priority;
         localPatch.priority = patch.priority;
+      }
+      if (patch.status !== undefined) {
+        // Kanban status and the completed flag stay in sync.
+        dbPatch.status = patch.status;
+        localPatch.status = patch.status;
+        dbPatch.completed = patch.status === "done";
+        localPatch.completed = patch.status === "done";
+        localPatch.completedAt = patch.status === "done" ? Date.now() : null;
       }
       if (patch.projectId !== undefined) {
         dbPatch.project_id = patch.projectId === INBOX_ID ? null : patch.projectId;
@@ -278,23 +303,39 @@ function useTasksState() {
       const target = tasks.find((t) => t.id === id);
       if (!target) return;
       const next = !target.completed;
+      const nextStatus: TaskStatus = next ? "done" : "todo";
       setTasks((prev) =>
         prev.map((t) =>
           t.id === id
-            ? { ...t, completed: next, completedAt: next ? Date.now() : null }
+            ? { ...t, completed: next, status: nextStatus, completedAt: next ? Date.now() : null }
             : t
         )
       );
       await supabase
         .from("tasks")
-        .update({ completed: next })
+        .update({ completed: next, status: nextStatus })
         .eq("id", id);
     },
     [tasks]
   );
 
+  const setAssignees = useCallback(
+    async (taskId: string, personIds: string[]) => {
+      if (!user) return;
+      setAssigneesByTask((prev) => ({ ...prev, [taskId]: personIds }));
+      await supabase.from("task_assignees").delete().eq("task_id", taskId);
+      if (personIds.length) {
+        await supabase
+          .from("task_assignees")
+          .insert(personIds.map((pid) => ({ user_id: user.id, task_id: taskId, person_id: pid })));
+      }
+    },
+    [user]
+  );
+
   const removeTask = useCallback(async (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    // Children (checklist steps) cascade in the DB; mirror that locally.
+    setTasks((prev) => prev.filter((t) => t.id !== id && t.parentId !== id));
     await supabase.from("tasks").delete().eq("id", id);
   }, []);
 
@@ -369,13 +410,32 @@ function useTasksState() {
     await supabase.from("projects").delete().eq("id", id);
   }, []);
 
+  // Checklist steps live as child tasks (parent_id). Top-level lists show only
+  // root tasks; children render inside the task's checklist.
+  const rootTasks = useMemo(() => tasks.filter((t) => !t.parentId), [tasks]);
+  const childrenByParent = useMemo(() => {
+    const map: Record<string, Task[]> = {};
+    for (const t of tasks) {
+      if (t.parentId) (map[t.parentId] ??= []).push(t);
+    }
+    for (const list of Object.values(map)) list.sort((a, b) => a.createdAt - b.createdAt);
+    return map;
+  }, [tasks]);
+  const checklistStats = useCallback(
+    (taskId: string) => {
+      const kids = childrenByParent[taskId] ?? [];
+      return { total: kids.length, done: kids.filter((k) => k.completed).length };
+    },
+    [childrenByParent]
+  );
+
   const stats = useMemo(
     () => ({
-      total: tasks.length,
-      completed: tasks.filter((t) => t.completed).length,
-      remaining: tasks.filter((t) => !t.completed).length,
+      total: rootTasks.length,
+      completed: rootTasks.filter((t) => t.completed).length,
+      remaining: rootTasks.filter((t) => !t.completed).length,
     }),
-    [tasks]
+    [rootTasks]
   );
 
   const projectStats = useMemo(() => {
@@ -387,6 +447,7 @@ function useTasksState() {
     ensure(INBOX_ID);
     for (const p of projects) ensure(p.id);
     for (const t of tasks) {
+      if (t.parentId) continue;
       const s = ensure(t.projectId);
       s.total += 1;
       if (t.completed) s.completed += 1;
@@ -397,6 +458,11 @@ function useTasksState() {
 
   return {
     tasks,
+    rootTasks,
+    childrenByParent,
+    checklistStats,
+    assigneesByTask,
+    setAssignees,
     projects,
     addTask,
     toggleTask,
