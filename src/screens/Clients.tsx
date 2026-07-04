@@ -10,13 +10,14 @@ import { ModalShell } from "@/components/pf/modals";
    counts, ARR) + full add/edit modal. Ported from the design system's
    ClientsScreen. */
 
-const STAGES = ["Active", "Expansion", "Onboarding", "Paused"];
+const STAGES = ["Pipeline", "Onboarding", "Active", "Expansion", "Paused"];
 const HEALTHS: ClientHealth[] = ["Healthy", "Watch", "At risk"];
 const stageTone: Record<string, "success" | "primary" | "neutral" | "accent"> = {
+  Pipeline: "neutral",
+  Onboarding: "accent",
   Active: "success",
   Expansion: "primary",
   Paused: "neutral",
-  Onboarding: "accent",
 };
 const healthTone: Record<ClientHealth, "success" | "warning" | "danger"> = {
   Healthy: "success",
