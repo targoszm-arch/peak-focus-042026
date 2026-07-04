@@ -30,6 +30,34 @@ steps), manage projects, and read clients.
    function. In Vercel → project → Firewall, add a custom rule
    "path starts with `/api/mcp` → Bypass" (or set Bot Protection to Log).
 
+
+## MCP write-call fallback
+
+Some ChatGPT Projects or custom GPT-style conversations can connect to a
+Developer MCP but fail at execution time with `FORBIDDEN: This conversation
+does not support developer MCPs`. That is a ChatGPT conversation capability
+issue, not a Peak Focus API authorization error. If recreating the chat or
+Project is not practical, use the admin-only HTTP fallback for bulk due-date
+patches:
+
+```bash
+curl -X POST "https://peak-focus.net/api/task-due-date-patch?key=<PF_MCP_SECRET>" \
+  -H "content-type: application/json" \
+  -d '{
+    "dryRun": true,
+    "dueDates": {
+      "PBBT-1": "2026-07-10",
+      "PBBT-2": "2026-07-17"
+    }
+  }'
+```
+
+Set `dryRun` to `false` after confirming the matched task titles. The endpoint
+uses the same service-role credentials and `PF_MCP_SECRET` as the MCP connector,
+scopes every update to `PF_MCP_USER_EMAIL`, and matches Linear keys such as
+`PBBT-1` in task titles or notes. Omit issue keys that have no Linear due date
+so those Peak Focus tasks stay blank.
+
 ## What Claude can then do
 
 - "What's due today?" / "What's overdue in Brilliancy Health?"
