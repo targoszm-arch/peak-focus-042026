@@ -1,20 +1,23 @@
-# File attachments — one-time setup
+# File attachments — setup
 
-The attachments feature needs a Storage bucket and a metadata table that
-this session's Supabase access can't create directly (it's read-only here).
-Run the migration once against the live project before using the feature:
+The attachments feature needs a Storage bucket and a metadata table,
+provisioned by `supabase/migrations/0005_attachments.sql` (creates the
+bucket + table) and `0006_attachments_50mb.sql` (raises the per-file limit
+to 50 MB). Both are already applied to the live project.
 
-1. Open the Supabase SQL editor for project `filtmcykamccfikuxehy`
-   (https://supabase.com/dashboard/project/filtmcykamccfikuxehy/sql/new).
-2. Paste and run the contents of `supabase/migrations/0005_attachments.sql`.
+For a fresh Supabase project (e.g. a new environment), apply them once:
+
+1. Open the Supabase SQL editor for the project
+   (`https://supabase.com/dashboard/project/<ref>/sql/new`).
+2. Paste and run `0005_attachments.sql`, then `0006_attachments_50mb.sql`, in order.
 3. Confirm it worked:
-   - **Storage → Buckets** shows a private `attachments` bucket (25 MB file limit).
+   - **Storage → Buckets** shows a private `attachments` bucket (50 MB file limit).
    - **Table editor** shows a `public.attachments` table with RLS enabled.
 
-Alternatively, from a machine with the Supabase CLI and write access:
+Or, from a machine with the Supabase CLI and write access:
 
 ```bash
-supabase db push --project-ref filtmcykamccfikuxehy
+supabase db push --project-ref <ref>
 ```
 
 Nothing else to configure — the app reads/writes through the existing
