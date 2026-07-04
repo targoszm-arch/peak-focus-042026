@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export type Priority = "high" | "medium" | "low" | "none";
 export type TimeOfDay = "anytime" | "morning" | "afternoon" | "evening" | "at_time";
 export type Repeat = "none" | "daily" | "weekdays" | "weekly" | "monthly";
+export type TaskStatus = "todo" | "progress" | "review" | "done";
 
 export type Task = {
   id: string;
@@ -29,6 +30,8 @@ export type Task = {
   repeat: Repeat;
   notes: string;
   parentId: string | null;
+  status: TaskStatus;
+  tag: string;
 };
 
 export type NewTaskInput = {
@@ -41,6 +44,8 @@ export type NewTaskInput = {
   repeat?: Repeat;
   notes?: string;
   parentId?: string | null;
+  status?: TaskStatus;
+  tag?: string;
 };
 
 export type Project = {
@@ -84,6 +89,8 @@ type DBTask = {
   repeat: Repeat | null;
   notes: string | null;
   parent_id: string | null;
+  status: TaskStatus | null;
+  tag: string | null;
 };
 type DBProject = { id: string; name: string; color: string; created_at: string };
 
@@ -102,6 +109,8 @@ function dbToTask(row: DBTask): Task {
     repeat: row.repeat ?? "none",
     notes: row.notes ?? "",
     parentId: row.parent_id,
+    status: row.status ?? (row.completed ? "done" : "todo"),
+    tag: row.tag ?? "",
   };
 }
 
@@ -265,6 +274,14 @@ function useTasksState() {
         dbPatch.notes = patch.notes;
         localPatch.notes = patch.notes;
       }
+      if (patch.status !== undefined) {
+        dbPatch.status = patch.status;
+        localPatch.status = patch.status;
+      }
+      if (patch.tag !== undefined) {
+        dbPatch.tag = patch.tag;
+        localPatch.tag = patch.tag;
+      }
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? { ...t, ...localPatch } : t))
       );
@@ -272,6 +289,18 @@ function useTasksState() {
     },
     []
   );
+
+  const setTaskStatus = useCallback(async (id: string, status: TaskStatus) => {
+    const completed = status === "done";
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, status, completed, completedAt: completed ? Date.now() : null }
+          : t
+      )
+    );
+    await supabase.from("tasks").update({ status, completed }).eq("id", id);
+  }, []);
 
   const toggleTask = useCallback(
     async (id: string) => {
@@ -404,6 +433,7 @@ function useTasksState() {
     updateTask,
     updateTaskFields,
     moveTask,
+    setTaskStatus,
     setTaskPriority,
     clearCompleted,
     addProject,
