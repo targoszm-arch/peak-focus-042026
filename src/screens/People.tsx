@@ -122,7 +122,7 @@ export default function People() {
   );
 
   return (
-    <div className="pf-page" style={{ width: "100%", maxWidth: 1200, margin: "0 auto", boxSizing: "border-box", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
+    <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
       <style>{`.pf-ppl-grid{display:grid;grid-template-columns:1fr;gap:14px;} @media (min-width:620px){ .pf-ppl-grid{grid-template-columns:repeat(2,1fr);} } @media (min-width:1080px){ .pf-ppl-grid{grid-template-columns:repeat(3,1fr);} }`}</style>
 
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>

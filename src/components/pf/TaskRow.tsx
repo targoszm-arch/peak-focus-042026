@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Icon, Checkbox } from "@/ds";
-import { useTasks, INBOX_ID, type Task } from "@/hooks/use-tasks";
+import { useTasks, type Task } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useFocusQueue } from "@/hooks/use-focus-queue";
 import { bucket, label as dueLabelFor } from "@/lib/pfdate";
@@ -22,11 +21,9 @@ export default function TaskRow({
   const { toggleTask, updateTaskFields, removeTask, checklistStats } = useTasks();
   const { projects } = useProjects();
   const focus = useFocusQueue();
-  const navigate = useNavigate();
   const [menu, setMenu] = useState<Menu>(null);
   const [editing, setEditing] = useState(false);
   const sub = checklistStats(task.id);
-  const canOpen = task.projectId !== INBOX_ID;
   const queued = focus.has(task.id);
 
   useEffect(() => {
@@ -103,8 +100,8 @@ export default function TaskRow({
      never fights the actions line for horizontal space. */
   return (
     <div
-      onClick={() => { if (canOpen) navigate(`/projects/${task.projectId}`); }}
-      title={canOpen ? "Open project" : undefined}
+      onClick={() => setEditing(true)}
+      title="Open task"
       className={`grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5 ${dense ? "px-3 py-2" : "px-3.5 py-3"}`}
       style={{
         background: "var(--surface-card)",
@@ -112,7 +109,7 @@ export default function TaskRow({
         border: "1px solid var(--border-soft)",
         transition: "border-color .15s, box-shadow .15s",
         opacity: task.completed ? 0.6 : 1,
-        cursor: canOpen ? "pointer" : "default",
+        cursor: "pointer",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.boxShadow = "var(--shadow-sm)";
@@ -129,30 +126,8 @@ export default function TaskRow({
       </span>
 
       <span
-        onClickCapture={(e) => e.stopPropagation()}
-        contentEditable
-        suppressContentEditableWarning
-        spellCheck={false}
-        title="Click to edit"
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            (e.currentTarget as HTMLElement).blur();
-          } else if (e.key === "Escape") {
-            e.currentTarget.textContent = task.title;
-            (e.currentTarget as HTMLElement).blur();
-          }
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.background = "var(--surface-sunken)";
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.background = "transparent";
-          const v = e.currentTarget.textContent?.trim() ?? "";
-          if (v && v !== task.title) updateTaskFields(task.id, { title: v });
-          else e.currentTarget.textContent = task.title;
-        }}
-        className="min-w-0 cursor-text whitespace-normal break-words outline-none"
+        title="Open task"
+        className="min-w-0 whitespace-normal break-words outline-none"
         style={{
           fontFamily: "var(--font-sans)",
           fontSize: 14,
