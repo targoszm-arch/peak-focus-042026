@@ -85,7 +85,9 @@
    behind a hamburger, a sticky mobile topbar appears, 2-col grids collapse,
    wide panels scroll horizontally. */
 @layer components {
-  .pf-shell { display: flex; height: 100dvh; }
+  /* --pf-vvh is set by use-keyboard-snapback while the on-screen keyboard is
+     open, shrinking the shell to the visible area above the keyboard. */
+  .pf-shell { display: flex; height: 100dvh; height: var(--pf-vvh, 100dvh); }
   .pf-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
   .pf-scroll { flex: 1; overflow-y: auto; }
 
