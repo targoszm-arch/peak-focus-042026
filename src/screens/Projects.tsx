@@ -170,7 +170,7 @@ export default function Projects() {
   };
 
   return (
-    <div className="pf-page" style={{ width: "100%", maxWidth: 1200, margin: "0 auto", boxSizing: "border-box", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
+    <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
       <style>{`@media (min-width: 720px){ .pf-proj-progress{display:flex !important;} } @media (min-width: 860px){ .pf-proj-due{display:inline-flex !important;} } @media (min-width: 980px){ .pf-proj-team{display:inline-flex !important;} }`}</style>
 
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -208,7 +208,7 @@ export default function Projects() {
 
       {view === "board" && <KanbanView tasks={projectTasks} onOpen={setEditTask} />}
       {view === "timeline" && <TimelineView tasks={projectTasks} onOpen={setEditTask} />}
-      {view === "calendar" && <CalendarView tasks={projectTasks} />}
+      {view === "calendar" && <CalendarView tasks={projectTasks} onOpen={setEditTask} />}
 
       {view === "list" && (
         <>
