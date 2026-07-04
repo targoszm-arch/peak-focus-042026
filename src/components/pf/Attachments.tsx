@@ -23,37 +23,44 @@ export default function Attachments({ taskId, projectId }: { taskId?: string; pr
         )}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {attachments.map((a) => (
-          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)" }}>
-            <Icon name="DocumentProperty1Linear" size={16} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-            <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-sans)", fontSize: 13.5, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={a.fileName}>
-              {a.fileName}
-            </span>
-            <span style={{ flexShrink: 0, fontFamily: "var(--font-sans)", fontSize: 11.5, color: "var(--text-tertiary)" }}>{formatBytes(a.sizeBytes)}</span>
-            <button
-              onClick={() => void download(a)}
-              title="Download"
-              style={{ flexShrink: 0, width: 32, height: 32, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-sm)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+      {attachments.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 6, marginBottom: 8 }}>
+          {attachments.map((a) => (
+            <div
+              key={a.id}
+              title={`${a.fileName} · ${formatBytes(a.sizeBytes)}`}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 6px 7px 9px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)", minWidth: 0 }}
             >
-              <Icon name="ArrowDownProperty1Linear" size={16} />
-            </button>
-            <button
-              onClick={() => {
-                if (window.confirm(`Delete "${a.fileName}"?`)) void remove(a);
-              }}
-              title="Delete"
-              style={{ flexShrink: 0, width: 32, height: 32, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-sm)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red-500)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
-            >
-              <Icon name="TrashProperty1Linear" size={16} />
-            </button>
-          </div>
-        ))}
+              <Icon name="DocumentProperty1Linear" size={14} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-sans)", fontSize: 12.5, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {a.fileName}
+              </span>
+              <button
+                onClick={() => void download(a)}
+                title="Download"
+                style={{ flexShrink: 0, width: 22, height: 22, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-sm)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+              >
+                <Icon name="ArrowDownProperty1Linear" size={13} />
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm(`Delete "${a.fileName}"?`)) void remove(a);
+                }}
+                title="Delete"
+                style={{ flexShrink: 0, width: 22, height: 22, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-sm)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red-500)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+              >
+                <Icon name="TrashProperty1Linear" size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {!loading && attachments.length === 0 && (
           <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-tertiary)", padding: "2px 2px 4px" }}>
             No files yet.
