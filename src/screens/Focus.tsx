@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, Button, Icon, Checkbox, Badge, IconButton } from "@/ds";
 import { useTasks, type Task } from "@/hooks/use-tasks";
 import { useTime } from "@/hooks/use-time";
@@ -48,61 +48,48 @@ export default function Focus() {
 
   const remainingCandidates = candidates.filter((t) => !queue.includes(t.id));
 
-  // Pomodoro timer.
-  const [secondsLeft, setSecondsLeft] = useState(FOCUS_SECS);
-  const [running, setRunning] = useState(false);
+  // Pomodoro timer — the countdown itself is local (nobody else needs "5:00
+  // left in this block"), but whether it's *running* and what it's running
+  // *for* comes from the single shared time-tracking session (useTime), the
+  // same source Dashboard's Time tracker reads. That's what keeps them in
+  // sync: starting a block here starts the one shared timer; starting a
+  // timer from the dashboard shows up here too instead of two independent
+  // "is something running" states drifting apart.
+  const [manualSecs, setManualSecs] = useState(FOCUS_SECS);
   const [mode] = useState<"focus" | "break">("focus");
-
-  useEffect(() => {
-    if (!running) return;
-    const id = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          setRunning(false);
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [running]);
+  const running = !!time.running;
+  const runningTask = time.running?.taskId ? byId.get(time.running.taskId) : null;
+  const runningLabel = runningTask?.title ?? time.running?.description ?? "Untitled focus";
+  const secondsLeft = running ? Math.max(0, FOCUS_SECS - Math.floor(time.durationOf(time.running!) / 1000)) : manualSecs;
 
   const toggleRun = () => {
-    if (!current) return;
-    const next = !running;
-    setRunning(next);
-    if (next) {
-      void time.start({ taskId: current.id, description: current.title });
-    } else {
+    if (running) {
       void time.stop();
+    } else if (current) {
+      void time.start({ taskId: current.id, description: current.title });
     }
   };
 
   const reset = () => {
-    setRunning(false);
-    setSecondsLeft(FOCUS_SECS);
-    void time.stop();
+    if (running) void time.stop();
+    setManualSecs(FOCUS_SECS);
   };
 
   const bump = (deltaMin: number) => {
-    setSecondsLeft((s) => Math.max(60, s + deltaMin * 60));
+    if (running) return;
+    setManualSecs((s) => Math.max(60, s + deltaMin * 60));
   };
 
   const completeCurrent = () => {
     if (!current) return;
     void toggleTask(current.id);
     setQueue((q) => q.filter((id) => id !== current.id));
-    setRunning(false);
-    setSecondsLeft(FOCUS_SECS);
-    void time.stop();
+    if (running) void time.stop();
+    setManualSecs(FOCUS_SECS);
   };
 
   const removeFromQueue = (id: string) => {
     setQueue((q) => q.filter((x) => x !== id));
-    if (current && current.id === id) {
-      setRunning(false);
-      setSecondsLeft(FOCUS_SECS);
-    }
   };
 
   const addToQueue = (id: string) => setQueue((q) => (q.includes(id) ? q : [...q, id]));
@@ -150,10 +137,19 @@ export default function Focus() {
           {/* LEFT — the timer */}
           <Card padding={28} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 22 }}>
             <div style={{ textAlign: "center", minHeight: 24 }}>
-              {current ? (
+              {running ? (
                 <>
                   <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text-tertiary)" }}>
                     Now focusing
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
+                    {runningLabel}
+                  </div>
+                </>
+              ) : current ? (
+                <>
+                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text-tertiary)" }}>
+                    Up next
                   </div>
                   <div style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>
                     {current.title}
@@ -184,7 +180,7 @@ export default function Focus() {
               <Button
                 variant={running ? "secondary" : "primary"}
                 size="lg"
-                disabled={!current}
+                disabled={!current && !running}
                 onClick={toggleRun}
                 leadingIcon={<Icon name={running ? "ClockProperty1Bold" : "TimerProperty1Bold"} size={18} />}
               >
@@ -198,10 +194,10 @@ export default function Focus() {
               >
                 Reset
               </Button>
-              <Button variant="ghost" size="lg" onClick={() => bump(5)}>
+              <Button variant="ghost" size="lg" disabled={running} onClick={() => bump(5)}>
                 +5 min
               </Button>
-              <Button variant="ghost" size="lg" onClick={() => bump(-5)}>
+              <Button variant="ghost" size="lg" disabled={running} onClick={() => bump(-5)}>
                 -5 min
               </Button>
             </div>

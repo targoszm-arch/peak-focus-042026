@@ -1,64 +1,25 @@
 import { useMemo } from "react";
-import { Card, StatCard, Icon, Badge } from "@/ds";
+import { Card, Icon, Badge } from "@/ds";
 import QuickAdd from "@/components/pf/QuickAdd";
 import TaskRow from "@/components/pf/TaskRow";
-import { useAuth } from "@/contexts/AuthContext";
 import { useTasks } from "@/hooks/use-tasks";
 import { useHabits } from "@/hooks/use-habits";
 import { bucket } from "@/lib/pfdate";
 
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
-}
-
 export default function Today() {
-  const { user } = useAuth();
   const { rootTasks: tasks, stats } = useTasks();
   const { habits, todayEntry, toggleHabit, currentStreak, weeklyCounts } = useHabits();
 
-  const name =
-    (user?.user_metadata?.full_name as string)?.split(" ")[0] ||
-    user?.email?.split("@")[0] ||
-    "there";
-
-  const { todays, overdueCount, completedToday } = useMemo(() => {
+  const { todays } = useMemo(() => {
     const todays = tasks.filter((t) => !t.completed && ["today", "overdue"].includes(bucket(t.endsAt)));
-    const overdueCount = tasks.filter((t) => !t.completed && bucket(t.endsAt) === "overdue").length;
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const completedToday = tasks.filter(
-      (t) => t.completed && t.completedAt && t.completedAt >= startOfToday.getTime()
-    ).length;
-    return { todays, overdueCount, completedToday };
+    return { todays };
   }, [tasks]);
-
-  const dateStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   return (
     <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 56px" }}>
-      <div>
-        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "var(--text-primary)" }}>
-          {greeting()}, {name} <span style={{ fontFamily: "var(--font-sans)" }}>👋</span>
-        </h1>
-        <p style={{ margin: "6px 0 0", fontSize: 14, color: "var(--text-secondary)" }}>
-          {dateStr} —{" "}
-          {todays.length === 0 ? "nothing due today, enjoy the summit." : `${todays.length} ${todays.length === 1 ? "task" : "tasks"} to climb today.`}
-        </p>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16, marginTop: 22 }}>
-        <StatCard icon={<Icon name="TaskSquareProperty1Bold" size={20} />} label="Due today" value={todays.length} iconTone="primary" />
-        <StatCard icon={<Icon name="FlagProperty1Bold" size={20} />} label="Overdue" value={overdueCount} iconTone="accent" />
-        <StatCard icon={<Icon name="TickCircleProperty1Bold" size={20} />} label="Completed today" value={completedToday} iconTone="success" />
-        <StatCard icon={<Icon name="StarProperty1Bold" size={20} />} label="Habit streak" value={currentStreak} iconTone="primary" />
-      </div>
-
       <div
         className="pf-2col"
-        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1fr)", gap: 16, marginTop: 16, alignItems: "start" }}
+        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1fr)", gap: 16, alignItems: "start" }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <QuickAdd placeholder="Add a task for today…" />
