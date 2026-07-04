@@ -212,13 +212,13 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
               const col = statusColor(t);
               return (
                 <div key={t.id} style={{ display: "flex", alignItems: "center", height: rowH, borderBottom: "1px solid var(--border-soft)" }}>
-                  <div style={{ width: labelW, flexShrink: 0, padding: "0 16px", borderRight: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 7, height: "100%" }}>
+                  <div onClick={() => onOpen(t)} title="Open task" style={{ width: labelW, flexShrink: 0, padding: "0 16px", borderRight: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 7, height: "100%", cursor: "pointer" }}>
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: col, flexShrink: 0 }} />
                     <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: t.completed ? "line-through" : "none" }}>{t.title}</span>
                   </div>
                   <div style={{ position: "relative", height: "100%", flex: 1 }}>
                     <div
-                      onClick={() => onOpen(t)}
+                      onClick={(e) => { e.stopPropagation(); onOpen(t); }}
                       title={`${t.title} · ${dueLabel(t.endsAt)}`}
                       style={{
                         position: "absolute", top: "50%", transform: "translateY(-50%)",
@@ -259,7 +259,7 @@ const calBtn: React.CSSProperties = {
   color: "var(--text-secondary)", cursor: "pointer", flexShrink: 0,
 };
 
-export function CalendarView({ tasks }: { tasks: Task[] }) {
+export function CalendarView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void }) {
   const base = new Date();
   const [month, setMonth] = useState(() => new Date(base.getFullYear(), base.getMonth(), 1));
   const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -299,7 +299,7 @@ export function CalendarView({ tasks }: { tasks: Task[] }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
           {cells.map((d, i) => {
-            if (!d) return <div key={i} style={{ minHeight: 96, borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none", borderBottom: "1px solid var(--border-soft)", background: "var(--surface-page)" }} />;
+            if (!d) return <div key={i} style={{ minHeight: 132, borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none", borderBottom: "1px solid var(--border-soft)", background: "var(--surface-page)" }} />;
             const di = iso(d);
             const list = tasksOn(d);
             const isToday = di === todayIso;
@@ -310,7 +310,7 @@ export function CalendarView({ tasks }: { tasks: Task[] }) {
                 key={i}
                 onClick={() => setSelected(di)}
                 style={{
-                  minHeight: 96, padding: 7, cursor: "pointer",
+                  minHeight: 132, padding: 7, cursor: "pointer",
                   borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none",
                   borderBottom: "1px solid var(--border-soft)",
                   background: isSel ? "color-mix(in srgb, var(--primary-500) 8%, white)" : weekend ? "var(--surface-page)" : "var(--surface-card)",
@@ -329,9 +329,14 @@ export function CalendarView({ tasks }: { tasks: Task[] }) {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {list.slice(0, 3).map((t) => (
-                    <div key={t.id} title={t.title} style={{ display: "flex", alignItems: "center", gap: 5, padding: "2px 6px", borderRadius: "var(--radius-sm)", background: `color-mix(in srgb, ${statusColor(t)} 13%, white)`, overflow: "hidden" }}>
-                      <span style={{ width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: statusColor(t) }} />
-                      <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: t.completed ? "line-through" : "none" }}>{t.title}</span>
+                    <div
+                      key={t.id}
+                      title={`Open ${t.title}`}
+                      onClick={(e) => { e.stopPropagation(); onOpen(t); }}
+                      style={{ display: "flex", alignItems: "flex-start", gap: 5, minHeight: 34, height: 34, padding: "3px 6px", borderRadius: "var(--radius-sm)", background: `color-mix(in srgb, ${statusColor(t)} 13%, white)`, overflow: "hidden", cursor: "pointer" }}
+                    >
+                      <span style={{ width: 5, height: 5, marginTop: 5, borderRadius: "50%", flexShrink: 0, background: statusColor(t) }} />
+                      <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, lineHeight: 1.25, color: "var(--text-primary)", whiteSpace: "normal", overflow: "hidden", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", textDecoration: t.completed ? "line-through" : "none" }}>{t.title}</span>
                     </div>
                   ))}
                   {list.length > 3 && <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)", paddingLeft: 6 }}>+{list.length - 3} more</span>}
