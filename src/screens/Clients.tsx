@@ -242,11 +242,11 @@ export default function Clients() {
               <button
                 onClick={() => setModal({ client: c })}
                 title="Edit client"
-                style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", justifySelf: "end" }}
+                style={{ width: 40, height: 40, borderRadius: "var(--radius-sm)", border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", justifySelf: "end" }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
               >
-                <Icon name="EditProperty1Linear" size={17} />
+                <Icon name="EditProperty1Linear" size={19} />
               </button>
             </div>
           );

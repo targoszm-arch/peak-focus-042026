@@ -131,9 +131,9 @@ export default function Projects() {
           role="button"
           title={isStar ? "Remove from favourites" : "Add to favourites"}
           onClick={(e) => { e.stopPropagation(); toggleStar(p.id); }}
-          style={{ flexShrink: 0, width: 30, height: 30, borderRadius: "var(--radius-sm)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: isStar ? "var(--yellow-500, #E6A609)" : "var(--text-tertiary)" }}
+          style={{ flexShrink: 0, width: 40, height: 40, margin: "-5px 0", borderRadius: "var(--radius-sm)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: isStar ? "var(--yellow-500, #E6A609)" : "var(--text-tertiary)" }}
         >
-          <Icon name={isStar ? "StarProperty1Bold" : "StarProperty1Linear"} size={17} />
+          <Icon name={isStar ? "StarProperty1Bold" : "StarProperty1Linear"} size={19} />
         </span>
       </button>
     );

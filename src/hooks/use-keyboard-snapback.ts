@@ -44,6 +44,9 @@ export function useKeyboardSnapback() {
     let shrunk = false; // whether --pf-vvh is currently applied
     let revealTimer: number | undefined;
     let syncTimer: number | undefined;
+    // The list scroll position from before reveal() moved it, so dismissing
+    // the keyboard returns the page to exactly where the user left it.
+    let savedScroll: { el: HTMLElement; top: number } | null = null;
 
     const pin = () => {
       if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
@@ -68,6 +71,10 @@ export function useKeyboardSnapback() {
         root.classList.remove(KB_CLASS);
       }
       pin();
+      if (savedScroll) {
+        savedScroll.el.scrollTo({ top: savedScroll.top, behavior: "smooth" });
+        savedScroll = null;
+      }
     };
 
     let ambiguousSince = 0;
@@ -81,7 +88,12 @@ export function useKeyboardSnapback() {
         root.style.setProperty(VAR, `${Math.round(vv.height)}px`);
         root.classList.add(KB_CLASS);
         pin();
-        if (!shrunk) scheduleReveal(80);
+        if (!shrunk) {
+          // Remember where the main scroller was before reveal() moves it.
+          const scroller = (document.activeElement as HTMLElement).closest(".pf-scroll");
+          if (scroller instanceof HTMLElement) savedScroll = { el: scroller, top: scroller.scrollTop };
+          scheduleReveal(80);
+        }
         shrunk = true;
         return;
       }
@@ -130,10 +142,28 @@ export function useKeyboardSnapback() {
     // delayed sync sees the restored viewport and resets.
     const onFocusOut = () => scheduleSync(300);
 
+    // iOS Safari does NOT blur a field when the user taps non-interactive
+    // space — the caret (and keyboard) stay until something else takes
+    // focus. Dismiss explicitly, like native apps: a touch that starts
+    // outside the focused field (and isn't on another field) blurs it,
+    // which closes the keyboard and lets sync() restore the layout.
+    const onPointerDown = (e: PointerEvent) => {
+      const active = document.activeElement;
+      if (!isEditable(active)) return;
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (active.contains(target)) return;
+      // Interactive targets (buttons, menus, other fields) manage focus
+      // themselves — only a tap on plain space dismisses.
+      if (target.closest("button, a, input, textarea, select, [contenteditable], [role='button'], label")) return;
+      active.blur();
+    };
+
     vv.addEventListener("resize", sync);
     vv.addEventListener("scroll", sync);
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
+    document.addEventListener("pointerdown", onPointerDown, true);
     return () => {
       window.clearTimeout(revealTimer);
       window.clearTimeout(syncTimer);
@@ -141,6 +171,7 @@ export function useKeyboardSnapback() {
       vv.removeEventListener("scroll", sync);
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
+      document.removeEventListener("pointerdown", onPointerDown, true);
       root.style.removeProperty(VAR);
       root.classList.remove(KB_CLASS);
     };
