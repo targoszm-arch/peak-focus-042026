@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Icon, ProgressBar, AvatarGroup } from "@/ds";
 import QuickAdd from "@/components/pf/QuickAdd";
 import TaskRow from "@/components/pf/TaskRow";
+import Attachments from "@/components/pf/Attachments";
 import { ProjectEditModal } from "@/components/pf/modals";
 import { useTasks } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
@@ -126,6 +127,10 @@ export default function ProjectDetail() {
             <Icon name="TaskSquareProperty1Bold" size={14} /> {open.length} open · {done.length} done
           </span>
         </div>
+      </div>
+
+      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18 }}>
+        <Attachments projectId={project.id} />
       </div>
 
       <QuickAdd defaultProjectId={project.id} placeholder={`Add a task to ${project.name}…`} />
