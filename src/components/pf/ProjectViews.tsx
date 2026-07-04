@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Icon, AvatarGroup } from "@/ds";
 import { useTasks, type Task, type TaskStatus } from "@/hooks/use-tasks";
 import { usePeople } from "@/hooks/use-people";
@@ -30,6 +30,11 @@ function startOfDay(d: Date): Date {
 }
 const dayMs = 86400000;
 const statusMeta = (status: TaskStatus) => PF_STATUS.find((s) => s.id === status) ?? PF_STATUS[0];
+
+// Module-level (not component state) so the horizontal scroll position
+// survives switching to another Projects tab and back — TimelineView
+// unmounts when the view switcher leaves "timeline". Resets on full reload.
+let timelineScrollLeft: number | null = null;
 
 /* ── shared card used by the board ── */
 function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) => void; dragging: boolean }) {
@@ -170,18 +175,32 @@ export function KanbanView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task)
 
 /* ══════════ TIMELINE (gantt) ══════════ */
 export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void }) {
+  const { projects } = useProjects();
+
+  // Resizable label column.
+  const [labelW, setLabelW] = useState(280);
+  const dragRef = useRef<{ startX: number; startW: number } | null>(null);
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!dragRef.current) return;
+      const delta = e.clientX - dragRef.current.startX;
+      setLabelW(Math.min(520, Math.max(160, dragRef.current.startW + delta)));
+    };
+    const onUp = () => { dragRef.current = null; };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, []);
+
   const dated = tasks.filter((t) => t.endsAt);
-  if (dated.length === 0) {
-    return (
-      <div style={{ padding: 40, textAlign: "center", color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", fontSize: 14, background: "var(--surface-card)", border: "1px dashed var(--border-strong)", borderRadius: "var(--radius-lg)" }}>
-        No dated tasks to place on the timeline yet.
-      </div>
-    );
-  }
   const startOf = (t: Task) => startOfDay(parseDay(t.startsAt || t.endsAt)!);
   const endOf = (t: Task) => startOfDay(parseDay(t.endsAt)!);
-  let min = startOf(dated[0]);
-  let max = endOf(dated[0]);
+  const now = startOfDay(new Date());
+  let min = dated.length ? startOf(dated[0]) : now;
+  let max = dated.length ? endOf(dated[0]) : now;
   dated.forEach((t) => {
     const s = startOf(t), e = endOf(t);
     if (s < min) min = s;
@@ -191,16 +210,69 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
   max = new Date(max.getTime() + dayMs);
   const spanDays = Math.round((max.getTime() - min.getTime()) / dayMs) + 1;
   const days = Array.from({ length: spanDays }, (_, i) => new Date(min.getTime() + i * dayMs));
-  const dayW = 46, labelW = 300, rowH = 46;
-  const todayIdx = Math.round((startOfDay(new Date()).getTime() - min.getTime()) / dayMs);
+  const dayW = 46, rowH = 46;
+  const todayIdx = Math.round((now.getTime() - min.getTime()) / dayMs);
   const statusFor = (t: Task) => statusMeta(t.status);
+
+  // Default horizontal scroll = the current week, leftmost — restored from
+  // the module-level value if the user already scrolled this session
+  // (persists across switching to Board/List/Calendar and back).
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const hasData = dated.length > 0;
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !hasData) return;
+    if (timelineScrollLeft !== null) {
+      el.scrollLeft = timelineScrollLeft;
+      return;
+    }
+    const mondayOffset = (new Date().getDay() + 6) % 7; // days since this week's Monday
+    const weekStartIdx = Math.max(0, todayIdx - mondayOffset);
+    const initial = weekStartIdx * dayW;
+    el.scrollLeft = initial;
+    timelineScrollLeft = initial;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasData]);
+
+  if (dated.length === 0) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", fontSize: 14, background: "var(--surface-card)", border: "1px dashed var(--border-strong)", borderRadius: "var(--radius-lg)" }}>
+        No dated tasks to place on the timeline yet.
+      </div>
+    );
+  }
+
+  // Group rows by project so it's clear which project each bar belongs to.
+  const projectMeta = (pid: string | null) => {
+    const p = pid ? projects.find((pr) => pr.id === pid) : null;
+    return { name: p?.name ?? "Chores", color: p?.color ?? "#8796AF" };
+  };
+  const groupMap = new Map<string, Task[]>();
+  for (const t of dated) {
+    const key = t.projectId || "inbox";
+    (groupMap.get(key) ?? groupMap.set(key, []).get(key)!).push(t);
+  }
+  const groups = [...groupMap.entries()]
+    .map(([key, items]) => ({ key, items, meta: projectMeta(key === "inbox" ? null : key) }))
+    .sort((a, b) => a.meta.name.localeCompare(b.meta.name));
+
+  // Frozen (sticky) so the task name stays visible while scrolling through days.
+  const stickyLabelCell: React.CSSProperties = { position: "sticky", left: 0, zIndex: 2, background: "var(--surface-card)" };
 
   return (
     <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", overflow: "hidden" }}>
-      <div style={{ overflowX: "auto" }}>
-        <div style={{ minWidth: `max(100%, ${labelW + spanDays * dayW}px)` }}>
+      <div ref={scrollRef} onScroll={(e) => { timelineScrollLeft = e.currentTarget.scrollLeft; }} style={{ overflowX: "auto" }}>
+        <div style={{ minWidth: `max(100%, ${labelW + spanDays * dayW}px)`, position: "relative" }}>
+          {/* drag handle to resize the label column, spanning header + all rows */}
+          <div
+            onPointerDown={(e) => { e.preventDefault(); dragRef.current = { startX: e.clientX, startW: labelW }; }}
+            title="Drag to resize"
+            style={{ position: "absolute", top: 0, bottom: 0, left: labelW - 3, width: 6, cursor: "col-resize", zIndex: 6, background: "transparent" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--primary-500) 35%, transparent)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          />
           <div style={{ display: "flex", borderBottom: "1px solid var(--border-soft)" }}>
-            <div style={{ width: labelW, flexShrink: 0, padding: "10px 16px", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-tertiary)", borderRight: "1px solid var(--border-soft)" }}>Task</div>
+            <div style={{ ...stickyLabelCell, width: labelW, flexShrink: 0, padding: "10px 16px", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-tertiary)", borderRight: "1px solid var(--border-soft)" }}>Task</div>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, flex: 1, minWidth: 0 }}>
               {days.map((d, i) => {
                 const isToday = i === todayIdx;
@@ -220,40 +292,51 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
             {todayIdx >= 0 && todayIdx < spanDays && (
               <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(${labelW}px + ((100% - ${labelW}px) / ${spanDays}) * ${todayIdx + 0.5})`, width: 2, background: "color-mix(in srgb, var(--primary-500) 55%, transparent)", zIndex: 1, pointerEvents: "none" }} />
             )}
-            {dated.map((t) => {
-              const s = startOf(t), e = endOf(t);
-              const startIndex = Math.round((s.getTime() - min.getTime()) / dayMs);
-              const duration = Math.round((e.getTime() - s.getTime()) / dayMs) + 1;
-              const status = statusFor(t);
-              const col = status.dot;
-              return (
-                <div key={t.id} style={{ display: "flex", alignItems: "center", height: rowH, borderBottom: "1px solid var(--border-soft)" }}>
-                  <div onClick={() => onOpen(t)} title="Open task" style={{ width: labelW, flexShrink: 0, padding: "0 16px", borderRight: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 7, height: "100%", cursor: "pointer" }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: col, flexShrink: 0 }} />
-                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: t.completed ? "line-through" : "none", flex: 1, minWidth: 0 }}>{t.title}</span>
-                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: col, background: `color-mix(in srgb, ${col} 12%, white)`, borderRadius: "var(--radius-full)", padding: "2px 6px", flexShrink: 0 }}>{status.title}</span>
-                  </div>
-                  <div style={{ position: "relative", height: "100%", flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, alignItems: "center" }}>
-                    <div
-                      onClick={(e) => { e.stopPropagation(); onOpen(t); }}
-                      title={`${t.title} · ${dueLabel(t.endsAt)}`}
-                      style={{
-                        gridColumn: `${startIndex + 1} / span ${duration}`, height: 22,
-                        margin: "0 5px", minWidth: 24,
-                        borderRadius: "var(--radius-full)", cursor: "pointer",
-                        background: `color-mix(in srgb, ${col} 20%, white)`,
-                        border: `1.5px solid ${col}`, display: "flex", alignItems: "center", paddingLeft: 8, gap: 5, overflow: "hidden",
-                      }}
-                    >
-                      {t.completed && <Icon name="TickCircleProperty1Bold" size={13} style={{ color: col, flexShrink: 0 }} />}
-                      <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: `color-mix(in srgb, ${col} 72%, black)`, whiteSpace: "nowrap" }}>
-                        {status.title} · {parseDay(t.endsAt)!.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </span>
-                    </div>
+            {groups.map((g, gi) => (
+              <Fragment key={g.key}>
+                <div style={{ display: "flex", alignItems: "center", height: 32, background: "var(--surface-sunken)", borderBottom: "1px solid var(--border-soft)", borderTop: gi > 0 ? "1px solid var(--border-soft)" : "none" }}>
+                  <div style={{ position: "sticky", left: 0, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 16px", zIndex: 2 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: g.meta.color, flexShrink: 0 }} />
+                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)", whiteSpace: "nowrap" }}>{g.meta.name}</span>
+                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)" }}>{g.items.length}</span>
                   </div>
                 </div>
-              );
-            })}
+                {g.items.map((t) => {
+                  const s = startOf(t), e = endOf(t);
+                  const startIndex = Math.round((s.getTime() - min.getTime()) / dayMs);
+                  const duration = Math.round((e.getTime() - s.getTime()) / dayMs) + 1;
+                  const status = statusFor(t);
+                  const col = status.dot;
+                  return (
+                    <div key={t.id} style={{ display: "flex", alignItems: "center", height: rowH, borderBottom: "1px solid var(--border-soft)" }}>
+                      <div onClick={() => onOpen(t)} title="Open task" style={{ ...stickyLabelCell, width: labelW, flexShrink: 0, padding: "0 16px", borderRight: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 7, height: "100%", cursor: "pointer" }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: col, flexShrink: 0 }} />
+                        <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: t.completed ? "line-through" : "none", flex: 1, minWidth: 0 }}>{t.title}</span>
+                        <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: col, background: `color-mix(in srgb, ${col} 12%, white)`, borderRadius: "var(--radius-full)", padding: "2px 6px", flexShrink: 0 }}>{status.title}</span>
+                      </div>
+                      <div style={{ position: "relative", height: "100%", flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, alignItems: "center" }}>
+                        <div
+                          onClick={(e) => { e.stopPropagation(); onOpen(t); }}
+                          title={`${t.title} · ${dueLabel(t.endsAt)}`}
+                          style={{
+                            gridColumn: `${startIndex + 1} / span ${duration}`, height: 22,
+                            margin: "0 5px", minWidth: 24,
+                            borderRadius: "var(--radius-full)", cursor: "pointer",
+                            background: `color-mix(in srgb, ${col} 20%, white)`,
+                            border: `1.5px solid ${col}`, display: "flex", alignItems: "center", paddingLeft: 8, gap: 5, overflow: "hidden",
+                          }}
+                        >
+                          {t.completed && <Icon name="TickCircleProperty1Bold" size={13} style={{ color: col, flexShrink: 0 }} />}
+                          <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: `color-mix(in srgb, ${col} 72%, black)`, whiteSpace: "nowrap" }}>
+                            {status.title} · {parseDay(t.endsAt)!.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </Fragment>
+            ))}
           </div>
         </div>
       </div>
