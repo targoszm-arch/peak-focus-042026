@@ -130,10 +130,28 @@ export function useKeyboardSnapback() {
     // delayed sync sees the restored viewport and resets.
     const onFocusOut = () => scheduleSync(300);
 
+    // iOS Safari does NOT blur a field when the user taps non-interactive
+    // space — the caret (and keyboard) stay until something else takes
+    // focus. Dismiss explicitly, like native apps: a touch that starts
+    // outside the focused field (and isn't on another field) blurs it,
+    // which closes the keyboard and lets sync() restore the layout.
+    const onPointerDown = (e: PointerEvent) => {
+      const active = document.activeElement;
+      if (!isEditable(active)) return;
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (active.contains(target)) return;
+      // Interactive targets (buttons, menus, other fields) manage focus
+      // themselves — only a tap on plain space dismisses.
+      if (target.closest("button, a, input, textarea, select, [contenteditable], [role='button'], label")) return;
+      active.blur();
+    };
+
     vv.addEventListener("resize", sync);
     vv.addEventListener("scroll", sync);
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
+    document.addEventListener("pointerdown", onPointerDown, true);
     return () => {
       window.clearTimeout(revealTimer);
       window.clearTimeout(syncTimer);
@@ -141,6 +159,7 @@ export function useKeyboardSnapback() {
       vv.removeEventListener("scroll", sync);
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
+      document.removeEventListener("pointerdown", onPointerDown, true);
       root.style.removeProperty(VAR);
       root.classList.remove(KB_CLASS);
     };
