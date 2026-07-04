@@ -16,11 +16,19 @@ steps), manage projects, and read clients.
    - `PF_MCP_USER_EMAIL` — the account whose workspace Claude manages,
      e.g. `magda@skillstudio.ai`
 2. **Redeploy** so the function picks up the env vars.
-3. **claude.ai → Settings → Connectors → Add custom connector**, URL:
+3. **claude.ai → Settings → Connectors → Add custom connector**, URL (secret
+   as a path segment — more reliable than a query param):
 
    ```
-   https://peak-focus.net/api/mcp?key=<PF_MCP_SECRET>
+   https://peak-focus.net/api/mcp/<PF_MCP_SECRET>
    ```
+
+   (`…/api/mcp?key=<PF_MCP_SECRET>` also works.)
+
+4. **If Vercel's Firewall bot protection / Attack Challenge Mode is enabled**,
+   it will 403-challenge Claude's connector client before it reaches the
+   function. In Vercel → project → Firewall, add a custom rule
+   "path starts with `/api/mcp` → Bypass" (or set Bot Protection to Log).
 
 ## What Claude can then do
 

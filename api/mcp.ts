@@ -363,12 +363,22 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
   const url = new URL(req.url);
+  // Secret accepted as ?key=, a /api/mcp/<secret> path segment (rewritten to
+  // ?key= by vercel.json), or a bearer token.
   const key = url.searchParams.get("key") ?? req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (key !== SECRET) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
-      status: 401,
+    // 403, not 401 — a 401 makes MCP clients assume OAuth and attempt
+    // dynamic client registration, which this server doesn't offer.
+    return new Response(JSON.stringify({ error: "forbidden" }), {
+      status: 403,
       headers: { "content-type": "application/json" },
     });
+  }
+  // Normalize the path so the MCP transport router sees /api/mcp even when
+  // the secret came in as a path segment.
+  if (url.pathname !== "/api/mcp") {
+    url.pathname = "/api/mcp";
+    req = new Request(url.toString(), req);
   }
   return mcp(req);
 }
