@@ -4,6 +4,7 @@ import { useTasks, type Task } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useTime, fmtClock, fmtDuration } from "@/hooks/use-time";
 import { bucket, label as dueLabel } from "@/lib/pfdate";
+import { TaskEditModal } from "@/components/pf/modals";
 
 const WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const PRIORITY_TONE: Record<string, "danger" | "primary" | "neutral"> = {
@@ -158,6 +159,7 @@ function TimeTracker() {
 }
 
 function UrgentTasks({ tasks, onToggle }: { tasks: Task[]; onToggle: (id: string) => void }) {
+  const [editTask, setEditTask] = useState<Task | null>(null);
   const urgent = tasks
     .filter((t) => !t.completed && ["overdue", "today"].includes(bucket(t.endsAt)))
     .slice(0, 6);
@@ -178,6 +180,8 @@ function UrgentTasks({ tasks, onToggle }: { tasks: Task[]; onToggle: (id: string
             return (
               <div
                 key={t.id}
+                onClick={() => setEditTask(t)}
+                title="Open task"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -185,9 +189,15 @@ function UrgentTasks({ tasks, onToggle }: { tasks: Task[]; onToggle: (id: string
                   padding: "10px 12px",
                   borderRadius: "var(--radius-md)",
                   border: "1px solid var(--border-soft)",
+                  cursor: "pointer",
+                  transition: "border-color .15s, box-shadow .15s",
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--border-strong)"; e.currentTarget.style.boxShadow = "var(--shadow-sm)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border-soft)"; e.currentTarget.style.boxShadow = "none"; }}
               >
-                <Checkbox checked={t.completed} onChange={() => onToggle(t.id)} />
+                <span onClick={(e) => e.stopPropagation()} className="inline-flex">
+                  <Checkbox checked={t.completed} onChange={() => onToggle(t.id)} />
+                </span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {t.title}
                 </span>
@@ -206,6 +216,7 @@ function UrgentTasks({ tasks, onToggle }: { tasks: Task[]; onToggle: (id: string
           })}
         </div>
       )}
+      {editTask && <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />}
     </Card>
   );
 }
