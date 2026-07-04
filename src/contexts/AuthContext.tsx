@@ -12,6 +12,7 @@ type AuthContextValue = {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  passwordRecovery: boolean;
   signInWithEmail: (email: string) => Promise<{ error: Error | null }>;
   signInWithPassword: (
     email: string,
@@ -21,6 +22,8 @@ type AuthContextValue = {
     email: string,
     password: string
   ) => Promise<{ error: Error | null; needsConfirmation: boolean }>;
+  resetPasswordForEmail: (email: string) => Promise<{ error: Error | null }>;
+  updatePassword: (password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -29,6 +32,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -37,8 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session ?? null);
       setLoading(false);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
     });
     return () => {
       mounted = false;
@@ -72,6 +77,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error ?? null, needsConfirmation };
   };
 
+  const resetPasswordForEmail = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    return { error: error ?? null };
+  };
+
+  const updatePassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (!error) setPasswordRecovery(false);
+    return { error: error ?? null };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -82,9 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: session?.user ?? null,
         session,
         loading,
+        passwordRecovery,
         signInWithEmail,
         signInWithPassword,
         signUpWithPassword,
+        resetPasswordForEmail,
+        updatePassword,
         signOut,
       }}
     >

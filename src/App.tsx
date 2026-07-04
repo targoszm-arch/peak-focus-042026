@@ -15,6 +15,7 @@ import { HealthProvider } from "@/hooks/use-health";
 import { FocusQueueProvider } from "@/hooks/use-focus-queue";
 import { useKeyboardSnapback } from "@/hooks/use-keyboard-snapback";
 import SignIn from "@/pages/SignIn";
+import ResetPassword from "@/pages/ResetPassword";
 
 function DataProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -52,7 +53,7 @@ import Placeholder from "@/screens/Placeholder";
 const queryClient = new QueryClient();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, passwordRecovery } = useAuth();
   useKeyboardSnapback();
   if (loading) {
     return (
@@ -61,6 +62,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       </main>
     );
   }
+  // A password-recovery link establishes a session on its own — intercept it
+  // here so the user sets a new password before landing in the app.
+  if (passwordRecovery) return <ResetPassword />;
   if (!user) return <SignIn />;
   return <>{children}</>;
 }
