@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Mail } from "lucide-react";
 
-type Mode = "signin" | "signup" | "magic";
+type Mode = "signin" | "signup" | "magic" | "reset";
 type Status = "idle" | "submitting" | "sent" | "confirm" | "error";
 
 const logo = "/brand/peak-focus-logo-white.png";
@@ -17,7 +17,7 @@ export default function SignIn() {
     canonical: "/sign-in",
   });
 
-  const { signInWithEmail, signInWithPassword, signUpWithPassword } = useAuth();
+  const { signInWithEmail, signInWithPassword, signUpWithPassword, resetPasswordForEmail } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,6 +32,17 @@ export default function SignIn() {
 
     if (mode === "magic") {
       const { error } = await signInWithEmail(email.trim());
+      if (error) {
+        setStatus("error");
+        setError(error.message);
+      } else {
+        setStatus("sent");
+      }
+      return;
+    }
+
+    if (mode === "reset") {
+      const { error } = await resetPasswordForEmail(email.trim());
       if (error) {
         setStatus("error");
         setError(error.message);
@@ -117,6 +128,8 @@ export default function SignIn() {
             ? "Start planning the work, then working the plan."
             : mode === "magic"
             ? "We'll email you a one-tap sign-in link."
+            : mode === "reset"
+            ? "Enter your email and we'll send you a password reset link."
             : "Sign in to continue to your workspace."}
         </p>
       </div>
@@ -132,7 +145,7 @@ export default function SignIn() {
           onChange={(e) => setEmail(e.target.value)}
           required
         />
-        {mode !== "magic" && (
+        {mode !== "magic" && mode !== "reset" && (
           <Input
             type="password"
             name="password"
@@ -144,17 +157,30 @@ export default function SignIn() {
             minLength={6}
           />
         )}
+        {mode === "signin" && (
+          <button
+            type="button"
+            onClick={() => switchMode("reset")}
+            style={{ alignSelf: "flex-end", fontSize: 12.5, color: "var(--text-secondary)", background: "none", border: "none", cursor: "pointer" }}
+          >
+            Forgot password?
+          </button>
+        )}
         <Button type="submit" className="w-full" disabled={status === "submitting"}>
           {status === "submitting"
             ? mode === "magic"
               ? "Sending…"
               : mode === "signup"
               ? "Creating account…"
+              : mode === "reset"
+              ? "Sending…"
               : "Signing in…"
             : mode === "magic"
             ? "Send magic link"
             : mode === "signup"
             ? "Create account"
+            : mode === "reset"
+            ? "Send reset link"
             : "Sign in"}
         </Button>
         {error && (
@@ -180,9 +206,9 @@ export default function SignIn() {
             Already have an account? Sign in
           </button>
         )}
-        {mode === "magic" && (
+        {(mode === "magic" || mode === "reset") && (
           <button type="button" onClick={() => switchMode("signin")} style={{ color: "var(--primary-500)", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
-            Use password instead
+            {mode === "reset" ? "Back to sign in" : "Use password instead"}
           </button>
         )}
       </div>
@@ -227,7 +253,9 @@ export default function SignIn() {
       {/* form / notice */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 24px" }}>
         {status === "sent"
-          ? notice("Check your inbox", <>We sent a magic link to <strong>{email}</strong>. Tap it to sign in.</>)
+          ? mode === "reset"
+            ? notice("Check your inbox", <>We sent a password reset link to <strong>{email}</strong>. Open it to choose a new password.</>)
+            : notice("Check your inbox", <>We sent a magic link to <strong>{email}</strong>. Tap it to sign in.</>)
           : status === "confirm"
           ? notice("Confirm your email", <>We sent a confirmation link to <strong>{email}</strong>. Open it, then come back and sign in.</>)
           : formPanel}
