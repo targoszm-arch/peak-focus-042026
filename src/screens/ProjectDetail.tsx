@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Icon, ProgressBar, AvatarGroup } from "@/ds";
 import QuickAdd from "@/components/pf/QuickAdd";
-import TaskRow from "@/components/pf/TaskRow";
+import { TaskCardGrid } from "@/components/pf/ProjectViews";
 import Attachments from "@/components/pf/Attachments";
-import { ProjectEditModal } from "@/components/pf/modals";
-import { useTasks } from "@/hooks/use-tasks";
+import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
+import { useTasks, type Task } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { usePeople } from "@/hooks/use-people";
@@ -19,6 +19,7 @@ export default function ProjectDetail() {
   const { clients } = useClients();
   const { people } = usePeople();
   const [editOpen, setEditOpen] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
 
   const project = projects.find((p) => p.id === id) ?? null;
   const client = project ? clients.find((c) => c.id === project.clientId) ?? null : null;
@@ -98,7 +99,18 @@ export default function ProjectDetail() {
               {project.name}
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-secondary)", flexWrap: "wrap" }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} /> {client?.name ?? "No client"}
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+              {client ? (
+                <button
+                  onClick={() => navigate(`/clients?client=${client.id}`)}
+                  title={`Open ${client.name} in Clients`}
+                  style={{ border: "none", background: "transparent", padding: 0, margin: 0, cursor: "pointer", font: "inherit", color: "inherit" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; e.currentTarget.style.textDecoration = "underline"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "inherit"; e.currentTarget.style.textDecoration = "none"; }}
+                >
+                  {client.name}
+                </button>
+              ) : "No client"}
               <span style={{ color: "var(--text-tertiary)" }}>·</span>
               <Icon name="CalendarProperty1Linear" size={13} style={{ color: "var(--text-tertiary)" }} /> Due {dueLabel(project.due)}
             </div>
@@ -144,7 +156,7 @@ export default function ProjectDetail() {
               No open tasks — this project is all caught up.
             </div>
           ) : (
-            open.map((t) => <TaskRow key={t.id} task={t} showProject={false} />)
+            <TaskCardGrid tasks={open} onOpen={setEditTask} />
           )}
         </div>
       </div>
@@ -153,13 +165,12 @@ export default function ProjectDetail() {
       {done.length > 0 && (
         <div>
           {groupHead("Done", done.length)}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {done.map((t) => <TaskRow key={t.id} task={t} showProject={false} />)}
-          </div>
+          <TaskCardGrid tasks={done} onOpen={setEditTask} />
         </div>
       )}
 
       {editOpen && <ProjectEditModal project={project} onClose={() => setEditOpen(false)} />}
+      {editTask && <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />}
     </div>
   );
 }

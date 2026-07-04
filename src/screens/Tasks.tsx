@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, Badge } from "@/ds";
 import QuickAdd from "@/components/pf/QuickAdd";
-import TaskRow from "@/components/pf/TaskRow";
+import { TaskCardGrid } from "@/components/pf/ProjectViews";
+import { TaskEditModal } from "@/components/pf/modals";
 import { useTasks, type Task } from "@/hooks/use-tasks";
 import { bucket, type Bucket } from "@/lib/pfdate";
 
@@ -16,6 +17,7 @@ const GROUPS: { key: Bucket | "done"; title: string }[] = [
 
 export default function Tasks() {
   const { rootTasks, stats } = useTasks();
+  const [editTask, setEditTask] = useState<Task | null>(null);
 
   const grouped = useMemo(() => {
     const map: Record<string, Task[]> = {};
@@ -48,11 +50,7 @@ export default function Tasks() {
                 <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{g.title}</h3>
                 <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontWeight: 600 }}>{items.length}</span>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {items.map((t) => (
-                  <TaskRow key={t.id} task={t} />
-                ))}
-              </div>
+              <TaskCardGrid tasks={items} onOpen={setEditTask} />
             </Card>
           );
         })}
@@ -62,6 +60,8 @@ export default function Tasks() {
           </div>
         )}
       </div>
+
+      {editTask && <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />}
     </div>
   );
 }

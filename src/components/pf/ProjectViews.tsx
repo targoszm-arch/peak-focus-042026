@@ -36,8 +36,8 @@ const statusMeta = (status: TaskStatus) => PF_STATUS.find((s) => s.id === status
 // unmounts when the view switcher leaves "timeline". Resets on full reload.
 let timelineScrollLeft: number | null = null;
 
-/* ── shared card used by the board ── */
-function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) => void; dragging: boolean }) {
+/* ── shared card used by the board (and any other card-grid view) ── */
+export function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) => void; dragging: boolean }) {
   const { checklistStats, assigneesByTask } = useTasks();
   const { people } = usePeople();
   const { projects } = useProjects();
@@ -117,6 +117,17 @@ function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) 
         <span style={{ flex: 1 }} />
         {assignees.length > 0 && <AvatarGroup users={assignees.map((a) => ({ name: a.name }))} size={22} max={3} />}
       </div>
+    </div>
+  );
+}
+
+/* ── responsive card grid — same PFTaskCard as the board, but a flat,
+   wrapping grid (3-5 columns depending on width, 1 on phones) for plain
+   task lists like Tasks and a project's To do/Done sections. ── */
+export function TaskCardGrid({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12, maxWidth: 1300 }}>
+      {tasks.map((t) => <PFTaskCard key={t.id} task={t} onOpen={onOpen} dragging={false} />)}
     </div>
   );
 }
