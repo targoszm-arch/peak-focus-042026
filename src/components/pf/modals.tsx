@@ -6,6 +6,7 @@ import { useProjects, type ProjectFull } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { usePeople } from "@/hooks/use-people";
 import { PRIORITY_TOKEN, PRIORITY_LABEL } from "./pf-helpers";
+import Attachments from "./Attachments";
 
 /* Shared modal chrome — ported from the design system's EditModals.jsx. */
 
@@ -366,6 +367,8 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
         <label style={fieldLabel}>Notes</label>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything this task needs — links, context, next actions…" rows={3} style={{ ...inputStyle, height: "auto", padding: "10px 12px", resize: "vertical", fontFamily: "var(--font-sans)" }} />
       </div>
+
+      <Attachments taskId={task.id} />
     </ModalShell>
   );
 }
