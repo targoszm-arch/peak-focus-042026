@@ -83,11 +83,18 @@ export function ModalShell({
   footer: React.ReactNode;
   width?: number;
 }) {
+  // Freeze the page beneath while the modal is open — scrolling inside the
+  // modal must not chain into .pf-scroll.
+  useEffect(() => {
+    document.documentElement.classList.add("pf-modal-open");
+    return () => document.documentElement.classList.remove("pf-modal-open");
+  }, []);
+
   // Portaled to <body>: keeps the fixed overlay independent of the shell
   // (which shrinks while the keyboard is open) and of list re-renders that
   // could unmount the row the modal was opened from.
   return createPortal(
-    <div onClick={onClose} style={overlay}>
+    <div onClick={onClose} style={{ ...overlay, touchAction: "none", overscrollBehavior: "none" }}>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -114,7 +121,7 @@ export function ModalShell({
             <Icon name="CloseCircleProperty1Linear" size={24} />
           </button>
         </div>
-        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", flex: 1 }}>{children}</div>
+        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", overflowX: "hidden", overscrollBehavior: "contain", touchAction: "pan-y", flex: 1 }}>{children}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 20px", borderTop: "1px solid var(--border-soft)", background: "var(--surface-sunken)", flexShrink: 0 }}>{footer}</div>
       </div>
     </div>,
@@ -319,7 +326,7 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
             <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: "var(--radius-sm)", border: "1.5px dashed var(--border-strong)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)" }}>
               <Icon name="AddProperty1Bold" size={13} />
             </span>
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addStep(); } }} placeholder="Add a step and press Enter" style={{ ...inputStyle, height: 34, fontSize: 13.5, flex: 1 }} />
+            <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addStep(); } }} placeholder="Add a step and press Enter" style={{ ...inputStyle, width: "auto", minWidth: 0, height: 34, fontSize: 13.5, flex: 1 }} />
             <button onClick={addStep} style={{ ...ghostBtn, height: 34, padding: "0 12px" }}>Add</button>
           </div>
         </div>

@@ -91,6 +91,8 @@
      belongs to the content and the focused field. */
   .pf-shell { display: flex; height: 100dvh; height: var(--pf-vvh, 100dvh); }
   .pf-kb-open .pf-peak { display: none; }
+  /* While a modal is open, the page beneath must not scroll. */
+  .pf-modal-open .pf-scroll { overflow: hidden; }
   .pf-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
   .pf-scroll { flex: 1; overflow-y: auto; }
 

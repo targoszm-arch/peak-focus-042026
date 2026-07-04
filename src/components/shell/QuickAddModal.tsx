@@ -9,7 +9,11 @@ export default function QuickAddModal({ open, onClose }: { open: boolean; onClos
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.documentElement.classList.add("pf-modal-open");
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.documentElement.classList.remove("pf-modal-open");
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -27,6 +31,8 @@ export default function QuickAddModal({ open, onClose }: { open: boolean; onClos
         justifyContent: "center",
         paddingTop: "14vh",
         backdropFilter: "blur(2px)",
+        touchAction: "none",
+        overscrollBehavior: "none",
       }}
     >
       <div onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: "92vw", animation: "pf-pop .2s ease both" }}>
