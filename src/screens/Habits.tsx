@@ -278,12 +278,13 @@ export default function Habits() {
       )}
 
       {/* body */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
-        {habits.length === 0 && (
-          <Card padding={28} style={{ textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-            No habits yet — add one to start a streak.
-          </Card>
-        )}
+      <style>{`.pf-habits-grid{display:grid;grid-template-columns:1fr;gap:12px;} @media (min-width:800px){ .pf-habits-grid{grid-template-columns:1fr 1fr;} }`}</style>
+      {habits.length === 0 && (
+        <Card padding={28} style={{ textAlign: "center", color: "var(--text-tertiary)", fontSize: 14, marginTop: 16 }}>
+          No habits yet — add one to start a streak.
+        </Card>
+      )}
+      <div className="pf-habits-grid" style={{ marginTop: 16 }}>
         {habits.map((h) => (
           <HabitRow
             key={h.id}

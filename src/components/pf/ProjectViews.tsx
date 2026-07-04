@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Icon, AvatarGroup } from "@/ds";
+import { Icon, AvatarGroup, Checkbox } from "@/ds";
 import { useTasks, type Task, type TaskStatus } from "@/hooks/use-tasks";
 import { usePeople } from "@/hooks/use-people";
 import { useProjects } from "@/hooks/use-projects";
@@ -38,7 +38,7 @@ let timelineScrollLeft: number | null = null;
 
 /* ── shared card used by the board (and any other card-grid view) ── */
 export function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) => void; dragging: boolean }) {
-  const { checklistStats, assigneesByTask } = useTasks();
+  const { checklistStats, assigneesByTask, toggleTask } = useTasks();
   const { people } = usePeople();
   const { projects } = useProjects();
   const overdue = bucket(task.endsAt) === "overdue" && !task.completed;
@@ -79,6 +79,9 @@ export function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t:
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border-soft)"; e.currentTarget.style.boxShadow = "0 1px 2px rgba(17,22,37,.05)"; }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span onClick={(e) => e.stopPropagation()} className="inline-flex shrink-0">
+          <Checkbox checked={task.completed} onChange={() => toggleTask(task.id)} />
+        </span>
         <span style={{ fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 700, lineHeight: 1.4, color: "var(--text-primary)", textDecoration: task.completed ? "line-through" : "none", flex: 1, minWidth: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
           {task.title}
         </span>
