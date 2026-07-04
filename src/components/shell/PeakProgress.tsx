@@ -31,6 +31,7 @@ export default function PeakProgress() {
 
   return (
     <div
+      className="pf-peak"
       style={{
         position: "relative",
         height: 122,
