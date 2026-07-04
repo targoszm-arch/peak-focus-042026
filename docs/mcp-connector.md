@@ -1,11 +1,31 @@
 # Peak Focus MCP connector
 
-A remote MCP server served by the app itself at `/api/mcp`. Add it to
-claude.ai as a **custom connector** and Claude can manage your workspace:
-list/create/update/complete/delete tasks (including execution-checklist
-steps), manage projects, and read clients.
+Two implementations exist. **Use the Supabase one** — it's the recommended,
+currently-supported path.
 
-## One-time setup
+## Recommended: Supabase Edge Function (self-contained)
+
+`supabase/functions/peak-focus-mcp/` — talks to Postgres directly with the
+auto-injected service-role key. No Vercel hop (so Vercel's firewall/bot
+protection can never block it), no Function secret to remember to set (the
+shared secret lives in a locked-down database table instead). Setup steps:
+**`supabase/functions/peak-focus-mcp/README.md`**.
+
+Connector URL:
+```
+https://filtmcykamccfikuxehy.supabase.co/functions/v1/peak-focus-mcp/<secret>
+```
+
+## Legacy: Vercel route (`/api/mcp`)
+
+Kept for reference; not recommended as the primary connector because Vercel's
+Firewall/bot protection can 403-challenge the MCP client before it ever
+reaches the function (workaround: add a custom Firewall rule "path starts
+with `/api/mcp` → Bypass"). A Supabase Edge Function was previously used to
+proxy around that, but it depended on a Function secret (`PEAK_FOCUS_MCP_KEY`)
+that was never set, which is what caused persistent 500s and a
+"couldn't register with sign-in service" error when adding the connector —
+the Supabase implementation above removes that whole failure mode.
 
 1. **Vercel → Project → Settings → Environment Variables** (all three for
    Production; never expose them client-side, so no `VITE_` prefix):
@@ -24,11 +44,6 @@ steps), manage projects, and read clients.
    ```
 
    (`…/api/mcp?key=<PF_MCP_SECRET>` also works.)
-
-4. **If Vercel's Firewall bot protection / Attack Challenge Mode is enabled**,
-   it will 403-challenge Claude's connector client before it reaches the
-   function. In Vercel → project → Firewall, add a custom rule
-   "path starts with `/api/mcp` → Bypass" (or set Bot Protection to Log).
 
 
 ## MCP write-call fallback
