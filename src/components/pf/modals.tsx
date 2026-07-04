@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/ds";
-import { useTasks, type Task, type Priority, INBOX_ID } from "@/hooks/use-tasks";
+import { useTasks, type Task, type Priority, type TaskStatus, INBOX_ID } from "@/hooks/use-tasks";
 import { useProjects, type ProjectFull } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { usePeople } from "@/hooks/use-people";
@@ -67,6 +67,12 @@ const primaryBtn: React.CSSProperties = {
   fontSize: 13.5,
   fontWeight: 700,
 };
+const TASK_STATUS: { id: TaskStatus; title: string; dot: string }[] = [
+  { id: "todo", title: "To Do", dot: "var(--neutral-400, #9aa3b2)" },
+  { id: "progress", title: "In Progress", dot: "var(--primary-500)" },
+  { id: "review", title: "In Review", dot: "var(--secondary-500)" },
+  { id: "done", title: "Done", dot: "var(--green-600, #2A9E75)" },
+];
 
 export function ModalShell({
   title,
@@ -140,6 +146,7 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
 
   const [title, setTitle] = useState(task.title);
   const [priority, setPriority] = useState<Priority>(task.priority);
+  const [status, setStatus] = useState<TaskStatus>(task.status);
   const [projectId, setProjectId] = useState(task.projectId === INBOX_ID ? "" : task.projectId);
   const [due, setDue] = useState(task.endsAt ? task.endsAt.slice(0, 10) : "");
   const [notes, setNotes] = useState(task.notes ?? "");
@@ -174,6 +181,7 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
       updateTaskFields(task.id, {
         title: n,
         priority,
+        status,
         projectId: projectId || INBOX_ID,
         endsAt: due || null,
       }),
@@ -226,6 +234,28 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
                 display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
               }}>
                 <Icon name="FlagProperty1Bold" size={13} /> {PRIORITY_LABEL[p]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <label style={fieldLabel}>Status</label>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
+          {TASK_STATUS.map((s) => {
+            const on = status === s.id;
+            return (
+              <button key={s.id} onClick={() => setStatus(s.id)} style={{
+                minHeight: 40, borderRadius: "var(--radius-md)", cursor: "pointer",
+                border: "1px solid " + (on ? s.dot : "var(--border-strong)"),
+                background: on ? `color-mix(in srgb, ${s.dot} 12%, white)` : "var(--surface-card)",
+                color: on ? s.dot : "var(--text-secondary)",
+                fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 700,
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+                padding: "0 8px",
+              }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.dot, flexShrink: 0 }} /> {s.title}
               </button>
             );
           })}

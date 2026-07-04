@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Icon, AvatarGroup } from "@/ds";
 import { useTasks, type Task, type TaskStatus } from "@/hooks/use-tasks";
 import { usePeople } from "@/hooks/use-people";
+import { useProjects } from "@/hooks/use-projects";
 import { bucket, label as dueLabel } from "@/lib/pfdate";
 import { PRIORITY_LABEL, PRIORITY_TOKEN } from "./pf-helpers";
 import TaskRow from "./TaskRow";
@@ -28,18 +29,25 @@ function startOfDay(d: Date): Date {
   return x;
 }
 const dayMs = 86400000;
+const statusMeta = (status: TaskStatus) => PF_STATUS.find((s) => s.id === status) ?? PF_STATUS[0];
 
 /* ── shared card used by the board ── */
 function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) => void; dragging: boolean }) {
   const { checklistStats, assigneesByTask } = useTasks();
   const { people } = usePeople();
+  const { projects } = useProjects();
   const overdue = bucket(task.endsAt) === "overdue" && !task.completed;
   const sub = checklistStats(task.id);
   const subPct = sub.total ? Math.round((sub.done / sub.total) * 100) : 0;
   const assignees = (assigneesByTask[task.id] ?? [])
     .map((id) => people.find((p) => p.id === id))
     .filter(Boolean) as { name: string }[];
+  const project = projects.find((p) => p.id === task.projectId) || null;
+  const status = statusMeta(task.status);
   const prTone = task.priority === "none" ? "--neutral-400" : PRIORITY_TOKEN[task.priority];
+  const formattedDate = task.endsAt
+    ? parseDay(task.endsAt)?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) ?? "No date"
+    : "No date";
 
   return (
     <div
@@ -69,6 +77,9 @@ function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) 
         <span style={{ fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 700, lineHeight: 1.4, color: "var(--text-primary)", textDecoration: task.completed ? "line-through" : "none", flex: 1, minWidth: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
           {task.title}
         </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 700, color: status.dot, background: `color-mix(in srgb, ${status.dot} 12%, white)`, border: `1px solid color-mix(in srgb, ${status.dot} 28%, white)`, borderRadius: "var(--radius-full)", padding: "2px 7px", flexShrink: 0 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: status.dot }} /> {status.title}
+        </span>
         {task.priority !== "none" && (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 700, color: `var(${prTone})`, flexShrink: 0 }}>
             <Icon name="FlagProperty1Bold" size={12} /> {PRIORITY_LABEL[task.priority]}
@@ -91,8 +102,12 @@ function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) 
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 10, borderTop: "1px solid var(--border-soft)" }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 600, color: overdue ? "var(--red-500)" : "var(--text-tertiary)" }}>
-          <Icon name="CalendarProperty1Linear" size={12} /> {dueLabel(task.endsAt)}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 600, color: "var(--text-tertiary)", minWidth: 0 }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: project?.color ?? "#8796AF", flexShrink: 0 }} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{project?.name ?? "Chores"}</span>
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 600, color: overdue ? "var(--red-500)" : "var(--text-tertiary)", flexShrink: 0 }}>
+          <Icon name="CalendarProperty1Linear" size={12} /> {formattedDate}
         </span>
         <span style={{ flex: 1 }} />
         {assignees.length > 0 && <AvatarGroup users={assignees.map((a) => ({ name: a.name }))} size={22} max={3} />}
@@ -178,7 +193,7 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
   const days = Array.from({ length: spanDays }, (_, i) => new Date(min.getTime() + i * dayMs));
   const dayW = 46, labelW = 300, rowH = 46;
   const todayIdx = Math.round((startOfDay(new Date()).getTime() - min.getTime()) / dayMs);
-  const statusColor = (t: Task) => PF_STATUS.find((s) => s.id === t.status)?.dot ?? "var(--primary-500)";
+  const statusFor = (t: Task) => statusMeta(t.status);
 
   return (
     <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", overflow: "hidden" }}>
@@ -209,12 +224,14 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
               const s = startOf(t), e = endOf(t);
               const startIndex = Math.round((s.getTime() - min.getTime()) / dayMs);
               const duration = Math.round((e.getTime() - s.getTime()) / dayMs) + 1;
-              const col = statusColor(t);
+              const status = statusFor(t);
+              const col = status.dot;
               return (
                 <div key={t.id} style={{ display: "flex", alignItems: "center", height: rowH, borderBottom: "1px solid var(--border-soft)" }}>
                   <div onClick={() => onOpen(t)} title="Open task" style={{ width: labelW, flexShrink: 0, padding: "0 16px", borderRight: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 7, height: "100%", cursor: "pointer" }}>
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: col, flexShrink: 0 }} />
-                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: t.completed ? "line-through" : "none" }}>{t.title}</span>
+                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: t.completed ? "line-through" : "none", flex: 1, minWidth: 0 }}>{t.title}</span>
+                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: col, background: `color-mix(in srgb, ${col} 12%, white)`, borderRadius: "var(--radius-full)", padding: "2px 6px", flexShrink: 0 }}>{status.title}</span>
                   </div>
                   <div style={{ position: "relative", height: "100%", flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, alignItems: "center" }}>
                     <div
@@ -230,7 +247,7 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
                     >
                       {t.completed && <Icon name="TickCircleProperty1Bold" size={13} style={{ color: col, flexShrink: 0 }} />}
                       <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: `color-mix(in srgb, ${col} 72%, black)`, whiteSpace: "nowrap" }}>
-                        {parseDay(t.endsAt)!.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {status.title} · {parseDay(t.endsAt)!.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </span>
                     </div>
                   </div>
@@ -277,7 +294,7 @@ export function CalendarView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
   const dueIso = (t: Task) => (t.endsAt ? t.endsAt.slice(0, 10) : null);
   const tasksOn = (d: Date) => tasks.filter((t) => dueIso(t) === iso(d));
   const selTasks = tasks.filter((t) => dueIso(t) === selected).sort((a, b) => Number(a.completed) - Number(b.completed));
-  const statusColor = (t: Task) => PF_STATUS.find((s) => s.id === t.status)?.dot ?? "var(--primary-500)";
+  const statusFor = (t: Task) => statusMeta(t.status);
   const shift = (delta: number) => setMonth(new Date(y, m + delta, 1));
 
   return (
@@ -328,23 +345,37 @@ export function CalendarView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
                   }}>{d.getDate()}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  {list.slice(0, 3).map((t) => (
-                    <div
-                      key={t.id}
-                      title={`Open ${t.title}`}
-                      onClick={(e) => { e.stopPropagation(); onOpen(t); }}
-                      style={{ display: "flex", alignItems: "flex-start", gap: 5, minHeight: 34, height: 34, padding: "3px 6px", borderRadius: "var(--radius-sm)", background: `color-mix(in srgb, ${statusColor(t)} 13%, white)`, overflow: "hidden", cursor: "pointer" }}
-                    >
-                      <span style={{ width: 5, height: 5, marginTop: 5, borderRadius: "50%", flexShrink: 0, background: statusColor(t) }} />
-                      <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, lineHeight: 1.25, color: "var(--text-primary)", whiteSpace: "normal", overflow: "hidden", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", textDecoration: t.completed ? "line-through" : "none" }}>{t.title}</span>
-                    </div>
-                  ))}
+                  {list.slice(0, 3).map((t) => {
+                    const status = statusFor(t);
+                    return (
+                      <div
+                        key={t.id}
+                        title={`Open ${t.title} · ${status.title}`}
+                        onClick={(e) => { e.stopPropagation(); onOpen(t); }}
+                        style={{ display: "flex", alignItems: "flex-start", gap: 5, minHeight: 38, height: 38, padding: "3px 6px", borderRadius: "var(--radius-sm)", background: `color-mix(in srgb, ${status.dot} 13%, white)`, overflow: "hidden", cursor: "pointer" }}
+                      >
+                        <span style={{ width: 5, height: 5, marginTop: 5, borderRadius: "50%", flexShrink: 0, background: status.dot }} />
+                        <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+                          <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, lineHeight: 1.15, color: "var(--text-primary)", whiteSpace: "normal", overflow: "hidden", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", textDecoration: t.completed ? "line-through" : "none" }}>{t.title}</span>
+                          <span style={{ fontFamily: "var(--font-sans)", fontSize: 9.5, fontWeight: 700, lineHeight: 1.1, color: status.dot, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{status.title}</span>
+                        </span>
+                      </div>
+                    );
+                  })}
                   {list.length > 3 && <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)", paddingLeft: 6 }}>+{list.length - 3} more</span>}
                 </div>
               </div>
             );
           })}
         </div>
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, margin: "-4px 2px 0" }}>
+        {PF_STATUS.map((s) => (
+          <span key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
+            <span style={{ width: 9, height: 9, borderRadius: "50%", background: s.dot }} /> {s.title}
+          </span>
+        ))}
       </div>
 
       <div>
