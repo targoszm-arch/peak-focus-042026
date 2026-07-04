@@ -4,35 +4,47 @@ import { useHabits, type Habit, type DailyEntry } from "@/hooks/use-habits";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-function WeekStrip({ habitKey, last7Days }: { habitKey: string; last7Days: DailyEntry[] }) {
+function WeekStrip({
+  habitKey,
+  last7Days,
+  onToggleDay,
+}: {
+  habitKey: string;
+  last7Days: DailyEntry[];
+  onToggleDay: (date: string) => void;
+}) {
   return (
-    <div style={{ display: "flex", gap: 7 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
       {last7Days.map((day, i) => {
         const done = !!day?.habits?.[habitKey];
+        const date = day?.date;
         return (
-          <div
-            key={day?.date ?? i}
-            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}
-          >
+          <div key={date ?? i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
             <span
               style={{
                 fontFamily: "var(--font-sans)",
-                fontSize: 10,
-                fontWeight: 600,
+                fontSize: 10.5,
+                fontWeight: 700,
                 color: "var(--text-tertiary)",
                 lineHeight: 1,
               }}
             >
               {WEEKDAYS[i]}
             </span>
-            <span
-              aria-label={done ? "done" : "not done"}
+            <button
+              onClick={() => date && onToggleDay(date)}
+              disabled={!date}
+              aria-pressed={done}
+              aria-label={`${WEEKDAYS[i]} — ${done ? "done" : "not done"}`}
               style={{
-                width: 14,
-                height: 14,
+                width: "100%",
+                maxWidth: 40,
+                aspectRatio: "1",
                 borderRadius: "50%",
                 background: done ? "var(--primary-500)" : "transparent",
-                border: done ? "1px solid var(--primary-500)" : "1px solid var(--border-strong)",
+                border: done ? "1.5px solid var(--primary-500)" : "1.5px solid var(--border-strong)",
+                cursor: date ? "pointer" : "default",
+                padding: 0,
               }}
             />
           </div>
@@ -48,6 +60,7 @@ function HabitRow({
   done,
   last7Days,
   onToggle,
+  onToggleDay,
   onRemove,
 }: {
   habit: Habit;
@@ -55,32 +68,30 @@ function HabitRow({
   done: boolean;
   last7Days: DailyEntry[];
   onToggle: () => void;
+  onToggleDay: (date: string) => void;
   onRemove: () => void;
 }) {
   const target = habit.weeklyTarget || 1;
   const pct = Math.round((Math.min(weeklyCount, target) / target) * 100);
   return (
     <Card padding={16}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 22, lineHeight: 1 }}>{habit.emoji}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{habit.emoji}</span>
         <span
           style={{
             fontFamily: "var(--font-sans)",
             fontSize: 15,
             fontWeight: 700,
             color: "var(--text-primary)",
-            minWidth: 120,
-            flex: "1 1 120px",
+            flex: 1,
+            minWidth: 0,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           {habit.label}
         </span>
-
-        <WeekStrip habitKey={habit.key} last7Days={last7Days} />
-
-        <div style={{ minWidth: 140, flex: "1 1 140px" }}>
-          <ProgressBar value={pct} tone="primary" label={`${weeklyCount}/${target} this week`} />
-        </div>
 
         <button
           onClick={onToggle}
@@ -101,6 +112,7 @@ function HabitRow({
             fontWeight: 600,
             cursor: "pointer",
             whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
         >
           <span style={{ color: done ? "var(--primary-500)" : "var(--border-strong)", display: "inline-flex" }}>
@@ -119,6 +131,7 @@ function HabitRow({
             justifyContent: "center",
             width: 34,
             height: 34,
+            flexShrink: 0,
             borderRadius: "var(--radius-md)",
             border: "1px solid var(--border-soft)",
             background: "var(--surface-card)",
@@ -128,6 +141,14 @@ function HabitRow({
         >
           <Icon name="TrashProperty1Linear" size={16} />
         </button>
+      </div>
+
+      <div style={{ marginTop: 12 }}>
+        <ProgressBar value={pct} tone="primary" label={`${weeklyCount}/${target} this week`} />
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <WeekStrip habitKey={habit.key} last7Days={last7Days} onToggleDay={onToggleDay} />
       </div>
     </Card>
   );
@@ -257,12 +278,13 @@ export default function Habits() {
       )}
 
       {/* body */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
-        {habits.length === 0 && (
-          <Card padding={28} style={{ textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-            No habits yet — add one to start a streak.
-          </Card>
-        )}
+      <style>{`.pf-habits-grid{display:grid;grid-template-columns:1fr;gap:12px;} @media (min-width:800px){ .pf-habits-grid{grid-template-columns:1fr 1fr;} }`}</style>
+      {habits.length === 0 && (
+        <Card padding={28} style={{ textAlign: "center", color: "var(--text-tertiary)", fontSize: 14, marginTop: 16 }}>
+          No habits yet — add one to start a streak.
+        </Card>
+      )}
+      <div className="pf-habits-grid" style={{ marginTop: 16 }}>
         {habits.map((h) => (
           <HabitRow
             key={h.id}
@@ -271,6 +293,7 @@ export default function Habits() {
             done={!!todayEntry.habits[h.key]}
             last7Days={last7Days}
             onToggle={() => toggleHabit(h.key)}
+            onToggleDay={(date) => toggleHabit(h.key, date)}
             onRemove={() => removeHabit(h.key)}
           />
         ))}

@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Icon, ProgressBar, AvatarGroup } from "@/ds";
 import QuickAdd from "@/components/pf/QuickAdd";
-import TaskRow from "@/components/pf/TaskRow";
+import { TaskCardGrid } from "@/components/pf/ProjectViews";
 import Attachments from "@/components/pf/Attachments";
-import { ProjectEditModal } from "@/components/pf/modals";
-import { useTasks } from "@/hooks/use-tasks";
+import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
+import { useTasks, type Task } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { usePeople } from "@/hooks/use-people";
@@ -19,6 +19,7 @@ export default function ProjectDetail() {
   const { clients } = useClients();
   const { people } = usePeople();
   const [editOpen, setEditOpen] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
 
   const project = projects.find((p) => p.id === id) ?? null;
   const client = project ? clients.find((c) => c.id === project.clientId) ?? null : null;
@@ -70,8 +71,10 @@ export default function ProjectDetail() {
         </button>
       </div>
 
+      <style>{`.pf-proj-head-grid{display:grid;grid-template-columns:1fr;gap:16px;} @media (min-width:760px){ .pf-proj-head-grid{grid-template-columns:1.5fr 1fr;} }`}</style>
+      <div className="pf-proj-head-grid">
       {/* header card */}
-      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 22, display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 22, display: "flex", flexDirection: "column", gap: 16, height: "100%", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <span style={{ width: 46, height: 46, borderRadius: "var(--radius-lg)", background: `color-mix(in srgb, ${color} 14%, white)`, color, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <Icon name="FolderProperty1Bold" size={24} />
@@ -98,7 +101,18 @@ export default function ProjectDetail() {
               {project.name}
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-secondary)", flexWrap: "wrap" }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} /> {client?.name ?? "No client"}
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+              {client ? (
+                <button
+                  onClick={() => navigate(`/clients?client=${client.id}`)}
+                  title={`Open ${client.name} in Clients`}
+                  style={{ border: "none", background: "transparent", padding: 0, margin: 0, cursor: "pointer", font: "inherit", color: "inherit" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; e.currentTarget.style.textDecoration = "underline"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "inherit"; e.currentTarget.style.textDecoration = "none"; }}
+                >
+                  {client.name}
+                </button>
+              ) : "No client"}
               <span style={{ color: "var(--text-tertiary)" }}>·</span>
               <Icon name="CalendarProperty1Linear" size={13} style={{ color: "var(--text-tertiary)" }} /> Due {dueLabel(project.due)}
             </div>
@@ -129,8 +143,9 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18 }}>
-        <Attachments projectId={project.id} />
+      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, height: "100%", boxSizing: "border-box", overflow: "hidden" }}>
+        <Attachments projectId={project.id} compact />
+      </div>
       </div>
 
       <QuickAdd defaultProjectId={project.id} placeholder={`Add a task to ${project.name}…`} />
@@ -144,7 +159,7 @@ export default function ProjectDetail() {
               No open tasks — this project is all caught up.
             </div>
           ) : (
-            open.map((t) => <TaskRow key={t.id} task={t} showProject={false} />)
+            <TaskCardGrid tasks={open} onOpen={setEditTask} />
           )}
         </div>
       </div>
@@ -153,13 +168,12 @@ export default function ProjectDetail() {
       {done.length > 0 && (
         <div>
           {groupHead("Done", done.length)}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {done.map((t) => <TaskRow key={t.id} task={t} showProject={false} />)}
-          </div>
+          <TaskCardGrid tasks={done} onOpen={setEditTask} />
         </div>
       )}
 
       {editOpen && <ProjectEditModal project={project} onClose={() => setEditOpen(false)} />}
+      {editTask && <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />}
     </div>
   );
 }

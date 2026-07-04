@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Icon, AvatarGroup } from "@/ds";
+import { Icon, AvatarGroup, Checkbox } from "@/ds";
 import { useTasks, type Task, type TaskStatus } from "@/hooks/use-tasks";
 import { usePeople } from "@/hooks/use-people";
 import { useProjects } from "@/hooks/use-projects";
@@ -36,9 +36,9 @@ const statusMeta = (status: TaskStatus) => PF_STATUS.find((s) => s.id === status
 // unmounts when the view switcher leaves "timeline". Resets on full reload.
 let timelineScrollLeft: number | null = null;
 
-/* ── shared card used by the board ── */
-function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) => void; dragging: boolean }) {
-  const { checklistStats, assigneesByTask } = useTasks();
+/* ── shared card used by the board (and any other card-grid view) ── */
+export function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) => void; dragging: boolean }) {
+  const { checklistStats, assigneesByTask, toggleTask } = useTasks();
   const { people } = usePeople();
   const { projects } = useProjects();
   const overdue = bucket(task.endsAt) === "overdue" && !task.completed;
@@ -79,6 +79,9 @@ function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) 
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border-soft)"; e.currentTarget.style.boxShadow = "0 1px 2px rgba(17,22,37,.05)"; }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span onClick={(e) => e.stopPropagation()} className="inline-flex shrink-0">
+          <Checkbox checked={task.completed} onChange={() => toggleTask(task.id)} />
+        </span>
         <span style={{ fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 700, lineHeight: 1.4, color: "var(--text-primary)", textDecoration: task.completed ? "line-through" : "none", flex: 1, minWidth: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
           {task.title}
         </span>
@@ -117,6 +120,17 @@ function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) 
         <span style={{ flex: 1 }} />
         {assignees.length > 0 && <AvatarGroup users={assignees.map((a) => ({ name: a.name }))} size={22} max={3} />}
       </div>
+    </div>
+  );
+}
+
+/* ── responsive card grid — same PFTaskCard as the board, but a flat,
+   wrapping grid (3-5 columns depending on width, 1 on phones) for plain
+   task lists like Tasks and a project's To do/Done sections. ── */
+export function TaskCardGrid({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12 }}>
+      {tasks.map((t) => <PFTaskCard key={t.id} task={t} onOpen={onOpen} dragging={false} />)}
     </div>
   );
 }

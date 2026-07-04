@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Icon, Badge, StatCard } from "@/ds";
 import { useClients, type Client, type ClientHealth } from "@/hooks/use-clients";
 import { useProjects } from "@/hooks/use-projects";
@@ -129,10 +129,19 @@ function ClientModal({ client, onClose }: { client: Client | null; onClose: () =
 
 export default function Clients() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const highlightId = searchParams.get("client");
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { clients, loading } = useClients();
   const { projects } = useProjects();
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState<{ client: Client | null } | null>(null);
+
+  // Deep-linked from a project's client name — scroll it into view and ring it.
+  useEffect(() => {
+    if (!highlightId) return;
+    rowRefs.current[highlightId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId, loading]);
 
   const projectsOf = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -188,7 +197,18 @@ export default function Clients() {
         {list.map((c) => {
           const projs = projectsOf.get(c.id) ?? [];
           return (
-            <div key={c.id} className="pf-cl-row" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, padding: "13px 18px", borderBottom: "1px solid var(--border-soft)", alignItems: "center" }}>
+            <div
+              key={c.id}
+              ref={(el) => { rowRefs.current[c.id] = el; }}
+              className="pf-cl-row"
+              style={{
+                display: "grid", gridTemplateColumns: "1fr auto", gap: 12, padding: "13px 18px",
+                borderBottom: "1px solid var(--border-soft)", alignItems: "center",
+                background: c.id === highlightId ? "color-mix(in srgb, var(--primary-500) 8%, white)" : undefined,
+                boxShadow: c.id === highlightId ? "inset 0 0 0 1.5px var(--primary-500)" : undefined,
+                transition: "background .3s, box-shadow .3s",
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                 <span style={{ width: 38, height: 38, flexShrink: 0, borderRadius: "var(--radius-md)", background: `color-mix(in srgb, ${c.color} 15%, white)`, color: c.color, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 800 }}>
                   {c.name.slice(0, 1).toUpperCase()}
