@@ -212,6 +212,15 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
   const days = Array.from({ length: spanDays }, (_, i) => new Date(min.getTime() + i * dayMs));
   const dayW = 46, rowH = 46;
   const todayIdx = Math.round((now.getTime() - min.getTime()) / dayMs);
+
+  // Group consecutive days into month segments for the header's month row.
+  const monthGroups: { key: string; label: string; startIdx: number; span: number }[] = [];
+  days.forEach((d, i) => {
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const last = monthGroups[monthGroups.length - 1];
+    if (last && last.key === key) last.span += 1;
+    else monthGroups.push({ key, label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }), startIdx: i, span: 1 });
+  });
   const statusFor = (t: Task) => statusMeta(t.status);
 
   // Default horizontal scroll = the current week, leftmost — restored from
@@ -271,21 +280,41 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
             onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--primary-500) 35%, transparent)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           />
-          <div style={{ display: "flex", borderBottom: "1px solid var(--border-soft)" }}>
-            <div style={{ ...stickyLabelCell, width: labelW, flexShrink: 0, padding: "10px 16px", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-tertiary)", borderRight: "1px solid var(--border-soft)" }}>Task</div>
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, flex: 1, minWidth: 0 }}>
-              {days.map((d, i) => {
-                const isToday = i === todayIdx;
-                const weekend = [0, 6].includes(d.getDay());
-                return (
-                  <div key={i} style={{ minWidth: dayW, textAlign: "center", padding: "7px 0", background: weekend ? "var(--surface-page)" : "transparent" }}>
-                    <div style={{ fontFamily: "var(--font-sans)", fontSize: 10, fontWeight: 700, color: isToday ? "var(--primary-500)" : "var(--text-tertiary)", textTransform: "uppercase" }}>
-                      {d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2)}
-                    </div>
-                    <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: isToday ? 800 : 600, color: isToday ? "var(--primary-500)" : "var(--text-secondary)" }}>{d.getDate()}</div>
+          <div style={{ borderBottom: "1px solid var(--border-soft)" }}>
+            <div style={{ display: "flex", borderBottom: "1px solid var(--border-soft)" }}>
+              <div style={{ ...stickyLabelCell, width: labelW, flexShrink: 0, borderRight: "1px solid var(--border-soft)" }} />
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, flex: 1, minWidth: 0 }}>
+                {monthGroups.map((g) => (
+                  <div
+                    key={g.key}
+                    style={{
+                      gridColumn: `${g.startIdx + 1} / span ${g.span}`,
+                      padding: "6px 10px", borderLeft: g.startIdx > 0 ? "1px solid var(--border-soft)" : "none",
+                      fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 800,
+                      color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}
+                  >
+                    {g.label}
                   </div>
-                );
-              })}
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex" }}>
+              <div style={{ ...stickyLabelCell, width: labelW, flexShrink: 0, padding: "10px 16px", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-tertiary)", borderRight: "1px solid var(--border-soft)" }}>Task</div>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, flex: 1, minWidth: 0 }}>
+                {days.map((d, i) => {
+                  const isToday = i === todayIdx;
+                  const weekend = [0, 6].includes(d.getDay());
+                  return (
+                    <div key={i} style={{ minWidth: dayW, textAlign: "center", padding: "7px 0", background: weekend ? "var(--surface-page)" : "transparent" }}>
+                      <div style={{ fontFamily: "var(--font-sans)", fontSize: 10, fontWeight: 700, color: isToday ? "var(--primary-500)" : "var(--text-tertiary)", textTransform: "uppercase" }}>
+                        {d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2)}
+                      </div>
+                      <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: isToday ? 800 : 600, color: isToday ? "var(--primary-500)" : "var(--text-secondary)" }}>{d.getDate()}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
           <div style={{ position: "relative" }}>
