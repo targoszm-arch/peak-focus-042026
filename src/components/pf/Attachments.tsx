@@ -1,16 +1,28 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Icon } from "@/ds";
 import { useAttachments, formatBytes } from "@/hooks/use-attachments";
+import { ModalShell } from "./modals";
 
 const fieldLabel: React.CSSProperties = {
   display: "block", fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 700,
   textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-tertiary)", marginBottom: 7,
 };
 
-/** Upload + list files attached to one task or one project. */
-export default function Attachments({ taskId, projectId }: { taskId?: string; projectId?: string }) {
+const MAX_COMPACT = 3;
+
+/**
+ * Upload + list files attached to one task or one project.
+ * In `compact` mode (for sitting side-by-side with other cards), only the
+ * first few files show; the rest are behind a "+N more" button that opens
+ * this same component full-size in a modal.
+ */
+export default function Attachments({ taskId, projectId, compact = false }: { taskId?: string; projectId?: string; compact?: boolean }) {
   const { attachments, loading, uploading, error, upload, download, remove } = useAttachments({ taskId, projectId });
   const inputRef = useRef<HTMLInputElement>(null);
+  const [viewAll, setViewAll] = useState(false);
+
+  const visible = compact ? attachments.slice(0, MAX_COMPACT) : attachments;
+  const hidden = attachments.length - visible.length;
 
   return (
     <div>
@@ -23,9 +35,9 @@ export default function Attachments({ taskId, projectId }: { taskId?: string; pr
         )}
       </div>
 
-      {attachments.length > 0 && (
+      {visible.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 6, marginBottom: 8 }}>
-          {attachments.map((a) => (
+          {visible.map((a) => (
             <div
               key={a.id}
               title={`${a.fileName} · ${formatBytes(a.sizeBytes)}`}
@@ -60,6 +72,19 @@ export default function Attachments({ taskId, projectId }: { taskId?: string; pr
         </div>
       )}
 
+      {compact && hidden > 0 && (
+        <button
+          onClick={() => setViewAll(true)}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5, marginBottom: 8,
+            border: "none", background: "transparent", padding: 0, cursor: "pointer",
+            fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 700, color: "var(--primary-500)",
+          }}
+        >
+          +{hidden} more <Icon name="ArrowRightProperty1Linear" size={12} />
+        </button>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {!loading && attachments.length === 0 && (
           <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-tertiary)", padding: "2px 2px 4px" }}>
@@ -67,34 +92,56 @@ export default function Attachments({ taskId, projectId }: { taskId?: string; pr
           </div>
         )}
 
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          hidden
-          onChange={(e) => {
-            if (e.target.files?.length) void upload(e.target.files);
-            e.target.value = "";
-          }}
-        />
-        <button
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          style={{
-            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
-            height: 36, borderRadius: "var(--radius-md)", border: "1.5px dashed var(--border-strong)",
-            background: "transparent", cursor: uploading ? "default" : "pointer",
-            fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600,
-            color: uploading ? "var(--text-tertiary)" : "var(--text-secondary)",
-          }}
-        >
-          <Icon name="AddProperty1Linear" size={14} /> {uploading ? "Uploading…" : "Upload files"}
-        </button>
+        {compact ? (
+          <button
+            onClick={() => setViewAll(true)}
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
+              height: 32, borderRadius: "var(--radius-md)", border: "1.5px dashed var(--border-strong)",
+              background: "transparent", cursor: "pointer",
+              fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-secondary)",
+            }}
+          >
+            <Icon name="AddProperty1Linear" size={13} /> Upload files
+          </button>
+        ) : (
+          <>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                if (e.target.files?.length) void upload(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <button
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
+                height: 36, borderRadius: "var(--radius-md)", border: "1.5px dashed var(--border-strong)",
+                background: "transparent", cursor: uploading ? "default" : "pointer",
+                fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600,
+                color: uploading ? "var(--text-tertiary)" : "var(--text-secondary)",
+              }}
+            >
+              <Icon name="AddProperty1Linear" size={14} /> {uploading ? "Uploading…" : "Upload files"}
+            </button>
+          </>
+        )}
 
         {error && (
           <div style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--red-500)" }}>{error}</div>
         )}
       </div>
+
+      {viewAll && (
+        <ModalShell title="Files" icon="DocumentProperty1Linear" onClose={() => setViewAll(false)} footer={null}>
+          <Attachments taskId={taskId} projectId={projectId} />
+        </ModalShell>
+      )}
     </div>
   );
 }

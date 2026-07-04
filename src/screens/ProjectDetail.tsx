@@ -71,8 +71,10 @@ export default function ProjectDetail() {
         </button>
       </div>
 
+      <style>{`.pf-proj-head-grid{display:grid;grid-template-columns:1fr;gap:16px;} @media (min-width:760px){ .pf-proj-head-grid{grid-template-columns:1.5fr 1fr;} }`}</style>
+      <div className="pf-proj-head-grid">
       {/* header card */}
-      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 22, display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 22, display: "flex", flexDirection: "column", gap: 16, height: "100%", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <span style={{ width: 46, height: 46, borderRadius: "var(--radius-lg)", background: `color-mix(in srgb, ${color} 14%, white)`, color, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <Icon name="FolderProperty1Bold" size={24} />
@@ -141,8 +143,9 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18 }}>
-        <Attachments projectId={project.id} />
+      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, height: "100%", boxSizing: "border-box", overflow: "hidden" }}>
+        <Attachments projectId={project.id} compact />
+      </div>
       </div>
 
       <QuickAdd defaultProjectId={project.id} placeholder={`Add a task to ${project.name}…`} />
