@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, Button, Icon, Badge, ProgressBar, Input } from "@/ds";
 import { useHabits, type Habit, type DailyEntry } from "@/hooks/use-habits";
 
@@ -62,6 +62,10 @@ function HabitRow({
   onToggle,
   onToggleDay,
   onRemove,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
 }: {
   habit: Habit;
   weeklyCount: number;
@@ -70,12 +74,30 @@ function HabitRow({
   onToggle: () => void;
   onToggleDay: (date: string) => void;
   onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
 }) {
   const target = habit.weeklyTarget || 1;
   const pct = Math.round((Math.min(weeklyCount, target) / target) * 100);
+  const reorderBtn = (enabled: boolean): React.CSSProperties => ({
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    width: 24, height: 20, border: "none", background: "transparent", padding: 0,
+    color: enabled ? "var(--text-tertiary)" : "var(--border-soft)",
+    cursor: enabled ? "pointer" : "default",
+  });
   return (
     <Card padding={16}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+          <button onClick={onMoveUp} disabled={!canMoveUp} title="Move up" style={reorderBtn(canMoveUp)}>
+            <Icon name="ArrowUpProperty1Linear" size={14} />
+          </button>
+          <button onClick={onMoveDown} disabled={!canMoveDown} title="Move down" style={reorderBtn(canMoveDown)}>
+            <Icon name="ArrowDownProperty1Linear" size={14} />
+          </button>
+        </div>
         <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{habit.emoji}</span>
         <span
           style={{
@@ -154,6 +176,8 @@ function HabitRow({
   );
 }
 
+const HABITS_ORDER_KEY = "pf.habits.order.v1";
+
 export default function Habits() {
   const {
     habits,
@@ -165,6 +189,27 @@ export default function Habits() {
     addHabit,
     removeHabit,
   } = useHabits();
+
+  // Client-side order (persisted locally) — drag-and-drop isn't reliable on
+  // iOS Safari (no HTML5 DnD touch support), so reordering is via up/down
+  // buttons instead, which work identically on desktop and mobile.
+  const [order, setOrder] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(HABITS_ORDER_KEY) || "[]"); } catch { return []; }
+  });
+  const orderedHabits = useMemo(() => {
+    const known = new Set(order);
+    const ids = [...order.filter((id) => habits.some((h) => h.id === id)), ...habits.filter((h) => !known.has(h.id)).map((h) => h.id)];
+    return ids.map((id) => habits.find((h) => h.id === id)!).filter(Boolean);
+  }, [habits, order]);
+  const moveHabit = (id: string, delta: number) => {
+    const ids = orderedHabits.map((h) => h.id);
+    const i = ids.indexOf(id);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    setOrder(ids);
+    try { localStorage.setItem(HABITS_ORDER_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
+  };
 
   const [showForm, setShowForm] = useState(false);
   const [emoji, setEmoji] = useState("✨");
@@ -285,7 +330,7 @@ export default function Habits() {
         </Card>
       )}
       <div className="pf-habits-grid" style={{ marginTop: 16 }}>
-        {habits.map((h) => (
+        {orderedHabits.map((h, i) => (
           <HabitRow
             key={h.id}
             habit={h}
@@ -295,6 +340,10 @@ export default function Habits() {
             onToggle={() => toggleHabit(h.key)}
             onToggleDay={(date) => toggleHabit(h.key, date)}
             onRemove={() => removeHabit(h.key)}
+            onMoveUp={() => moveHabit(h.id, -1)}
+            onMoveDown={() => moveHabit(h.id, 1)}
+            canMoveUp={i > 0}
+            canMoveDown={i < orderedHabits.length - 1}
           />
         ))}
       </div>

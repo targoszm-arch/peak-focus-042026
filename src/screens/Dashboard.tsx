@@ -7,6 +7,7 @@ import { bucket, label as dueLabel } from "@/lib/pfdate";
 import { TaskEditModal } from "@/components/pf/modals";
 
 const WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WIDGET_ORDER_KEY = "pf.dashboard.widgetOrder.v1";
 const PRIORITY_TONE: Record<string, "danger" | "primary" | "neutral"> = {
   high: "danger",
   medium: "primary",
@@ -14,13 +15,25 @@ const PRIORITY_TONE: Record<string, "danger" | "primary" | "neutral"> = {
   none: "neutral",
 };
 
-function TimeTracker() {
+function TimeTracker({ tasks }: { tasks: Task[] }) {
   const { running, start, stop, durationOf, stats, now } = useTime();
   const [desc, setDesc] = useState("");
+  const [taskId, setTaskId] = useState("");
+
+  const openTasks = useMemo(() => tasks.filter((t) => !t.completed), [tasks]);
+  const runningTask = running?.taskId ? tasks.find((t) => t.id === running.taskId) : null;
+  const runningLabel = runningTask?.title || running?.description || "Untitled focus";
 
   const max = Math.max(1, ...stats.perDay);
   const deltaPct =
     stats.prevWeek > 0 ? Math.round(((stats.week - stats.prevWeek) / stats.prevWeek) * 100) : null;
+
+  const doStart = () => {
+    const task = openTasks.find((t) => t.id === taskId);
+    start({ description: task ? task.title : desc.trim(), taskId: task?.id ?? null });
+    setDesc("");
+    setTaskId("");
+  };
 
   return (
     <Card padding={22}>
@@ -51,7 +64,7 @@ function TimeTracker() {
                 </span>
               </span>
               <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
-                {running.description || "Untitled focus"}
+                {runningLabel}
               </span>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -68,24 +81,44 @@ function TimeTracker() {
           </>
         ) : (
           <>
+            <select
+              value={taskId}
+              onChange={(e) => setTaskId(e.target.value)}
+              style={{
+                flex: "1 1 180px",
+                minWidth: 160,
+                height: 40,
+                padding: "0 10px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border-soft)",
+                background: "var(--surface-card)",
+                fontFamily: "var(--font-sans)",
+                fontSize: 14,
+                color: "var(--text-primary)",
+                outline: "none",
+              }}
+            >
+              <option value="">Link a task (optional)</option>
+              {openTasks.map((t) => (
+                <option key={t.id} value={t.id}>{t.title}</option>
+              ))}
+            </select>
             <input
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && desc.trim()) {
-                  start({ description: desc.trim() });
-                  setDesc("");
-                }
+                if (e.key === "Enter") doStart();
               }}
-              placeholder="What are you working on?"
+              disabled={!!taskId}
+              placeholder={taskId ? "Using the linked task's title" : "Or describe what you're working on"}
               style={{
-                flex: 1,
+                flex: "1 1 180px",
                 minWidth: 180,
                 height: 40,
                 padding: "0 14px",
                 borderRadius: "var(--radius-md)",
                 border: "1px solid var(--border-soft)",
-                background: "var(--surface-card)",
+                background: taskId ? "var(--surface-sunken)" : "var(--surface-card)",
                 fontFamily: "var(--font-sans)",
                 fontSize: 14,
                 color: "var(--text-primary)",
@@ -95,10 +128,7 @@ function TimeTracker() {
             <Button
               variant="primary"
               size="md"
-              onClick={() => {
-                start({ description: desc.trim() });
-                setDesc("");
-              }}
+              onClick={doStart}
               leadingIcon={<Icon name="TimerProperty1Bold" size={16} />}
             >
               Start timer
@@ -231,6 +261,26 @@ export default function Dashboard() {
 
   const dateStr = new Date().toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" });
 
+  // Which widget sits in the left (wide) vs right slot of the grid below —
+  // persisted locally so the dashboard stays customized. Reordering is via
+  // swap buttons rather than drag: native HTML5 drag-and-drop has no touch
+  // support on iOS Safari, so a drag handle would silently not work there.
+  const [widgetOrder, setWidgetOrder] = useState<["time" | "urgent", "time" | "urgent"]>(() => {
+    try {
+      const saved = localStorage.getItem(WIDGET_ORDER_KEY);
+      if (saved === "urgent,time") return ["urgent", "time"];
+    } catch { /* ignore */ }
+    return ["time", "urgent"];
+  });
+  const swapWidgets = () => {
+    setWidgetOrder(([a, b]) => {
+      const next: ["time" | "urgent", "time" | "urgent"] = [b, a];
+      try { localStorage.setItem(WIDGET_ORDER_KEY, next.join(",")); } catch { /* ignore */ }
+      return next;
+    });
+  };
+  const widgets = { time: <TimeTracker tasks={tasks} />, urgent: <UrgentTasks tasks={tasks} onToggle={toggleTask} /> };
+
   return (
     <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 56px" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
@@ -245,12 +295,26 @@ export default function Dashboard() {
         <StatCard icon={<Icon name="TaskSquareProperty1Bold" size={20} />} label="Open tasks" value={stats.remaining} iconTone="primary" />
       </div>
 
+      <button
+        onClick={swapWidgets}
+        title="Swap widget positions"
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 6, marginTop: 16,
+          height: 30, padding: "0 10px", borderRadius: "var(--radius-md)",
+          border: "1px solid var(--border-soft)", background: "var(--surface-card)",
+          color: "var(--text-secondary)", cursor: "pointer",
+          fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600,
+        }}
+      >
+        <Icon name="ArrowLeftProperty1Linear" size={13} /><Icon name="ArrowRightProperty1Linear" size={13} /> Swap widgets
+      </button>
+
       <div
         className="pf-2col"
-        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) minmax(0, 1fr)", gap: 16, marginTop: 16, alignItems: "start" }}
+        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) minmax(0, 1fr)", gap: 16, marginTop: 10, alignItems: "start" }}
       >
-        <TimeTracker />
-        <UrgentTasks tasks={tasks} onToggle={toggleTask} />
+        {widgets[widgetOrder[0]]}
+        {widgets[widgetOrder[1]]}
       </div>
     </div>
   );
