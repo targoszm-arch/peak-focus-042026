@@ -78,21 +78,25 @@ export function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t:
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--border-strong)"; e.currentTarget.style.boxShadow = "var(--shadow-sm)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border-soft)"; e.currentTarget.style.boxShadow = "0 1px 2px rgba(17,22,37,.05)"; }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span onClick={(e) => e.stopPropagation()} className="inline-flex shrink-0">
-          <Checkbox checked={task.completed} onChange={() => toggleTask(task.id)} />
-        </span>
-        <span style={{ fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 700, lineHeight: 1.4, color: "var(--text-primary)", textDecoration: task.completed ? "line-through" : "none", flex: 1, minWidth: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-          {task.title}
-        </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 700, color: status.dot, background: `color-mix(in srgb, ${status.dot} 12%, white)`, border: `1px solid color-mix(in srgb, ${status.dot} 28%, white)`, borderRadius: "var(--radius-full)", padding: "2px 7px", flexShrink: 0 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: status.dot }} /> {status.title}
-        </span>
-        {task.priority !== "none" && (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 700, color: `var(${prTone})`, flexShrink: 0 }}>
-            <Icon name="FlagProperty1Bold" size={12} /> {PRIORITY_LABEL[task.priority]}
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span onClick={(e) => e.stopPropagation()} className="inline-flex shrink-0">
+            <Checkbox checked={task.completed} onChange={() => toggleTask(task.id)} />
           </span>
-        )}
+          <span style={{ fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 700, lineHeight: 1.4, color: "var(--text-primary)", textDecoration: task.completed ? "line-through" : "none", flex: 1, minWidth: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+            {task.title}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 700, color: status.dot, background: `color-mix(in srgb, ${status.dot} 12%, white)`, border: `1px solid color-mix(in srgb, ${status.dot} 28%, white)`, borderRadius: "var(--radius-full)", padding: "2px 7px", flexShrink: 0 }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: status.dot }} /> {status.title}
+          </span>
+          {task.priority !== "none" && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 700, color: `var(${prTone})`, flexShrink: 0 }}>
+              <Icon name="FlagProperty1Bold" size={12} /> {PRIORITY_LABEL[task.priority]}
+            </span>
+          )}
+        </div>
       </div>
 
       {sub.total > 0 && (
@@ -192,13 +196,16 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
   const { projects } = useProjects();
 
   // Resizable label column.
-  const [labelW, setLabelW] = useState(280);
+  // Default narrower on small screens so the day grid is visible without
+  // needing to drag-resize first — the resize handle is hard to hit precisely
+  // with a finger, so mobile shouldn't depend on it just to see any tasks.
+  const [labelW, setLabelW] = useState(() => (typeof window !== "undefined" && window.innerWidth < 700 ? 130 : 280));
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       if (!dragRef.current) return;
       const delta = e.clientX - dragRef.current.startX;
-      setLabelW(Math.min(520, Math.max(160, dragRef.current.startW + delta)));
+      setLabelW(Math.min(520, Math.max(90, dragRef.current.startW + delta)));
     };
     const onUp = () => { dragRef.current = null; };
     window.addEventListener("pointermove", onMove);
@@ -388,7 +395,7 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
           onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = { startX: e.clientX, startW: labelW }; }}
           title="Drag to resize"
           style={{
-            position: "absolute", top: 0, bottom: 0, left: labelW - 4, width: 8, cursor: "col-resize", zIndex: 20,
+            position: "absolute", top: 0, bottom: 0, left: labelW - 12, width: 24, cursor: "col-resize", zIndex: 20,
             touchAction: "none", display: "flex", justifyContent: "center",
           }}
           onMouseEnter={(e) => { (e.currentTarget.firstChild as HTMLElement).style.background = "var(--primary-500)"; }}
