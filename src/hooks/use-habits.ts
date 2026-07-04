@@ -283,22 +283,22 @@ function useHabitsState() {
   );
 
   const toggleHabit = useCallback(
-    async (key: HabitKey) => {
+    async (key: HabitKey, date: string = today) => {
       if (!user) return;
       const habit = habits.find((h) => h.key === key);
       if (!habit) return;
-      const current = entries[today] ?? blankEntry(today);
+      const current = entries[date] ?? blankEntry(date);
       const next = !current.habits[key];
       setEntries((prev) => {
-        const e = prev[today] ?? blankEntry(today);
-        return { ...prev, [today]: { ...e, habits: { ...e.habits, [key]: next } } };
+        const e = prev[date] ?? blankEntry(date);
+        return { ...prev, [date]: { ...e, habits: { ...e.habits, [key]: next } } };
       });
       if (next) {
         await supabase.from("habit_logs").upsert(
           {
             user_id: user.id,
             habit_id: habit.id,
-            log_date: today,
+            log_date: date,
             done: true,
           },
           { onConflict: "user_id,habit_id,log_date" }
@@ -309,7 +309,7 @@ function useHabitsState() {
           .delete()
           .eq("user_id", user.id)
           .eq("habit_id", habit.id)
-          .eq("log_date", today);
+          .eq("log_date", date);
       }
     },
     [user, habits, entries, today]
