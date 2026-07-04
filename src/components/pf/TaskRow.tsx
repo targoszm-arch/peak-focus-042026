@@ -53,11 +53,20 @@ export default function TaskRow({
     border: "none",
     background: "transparent",
     cursor: "pointer",
-    padding: "3px 6px",
+    minHeight: 36,
+    padding: "5px 8px",
     borderRadius: "var(--radius-sm)",
     fontFamily: "var(--font-sans)",
     whiteSpace: "nowrap",
     flexShrink: 0,
+  };
+  // Icon-only actions get a full thumb-sized (40px) hit area.
+  const iconBtn: React.CSSProperties = {
+    ...trigger,
+    width: 40,
+    height: 40,
+    padding: 0,
+    justifyContent: "center",
   };
   const menuBox: React.CSSProperties = {
     position: "absolute",
@@ -206,9 +215,9 @@ export default function TaskRow({
           <button
             onClick={() => setMenu(menu === "priority" ? null : "priority")}
             title="Change priority"
-            style={{ ...trigger, color: `var(${prTone})`, padding: "3px 4px" }}
+            style={{ ...iconBtn, color: `var(${prTone})` }}
           >
-            <Icon name="FlagProperty1Bold" size={15} />
+            <Icon name="FlagProperty1Bold" size={18} />
           </button>
           {menu === "priority" && (
             <div style={menuBox}>
@@ -254,25 +263,25 @@ export default function TaskRow({
               onClick={() => (queued ? focus.remove(task.id) : focus.add(task.id))}
               title={queued ? "In focus queue — remove" : "Add to focus"}
               style={{
-                ...trigger, padding: "3px 4px",
+                ...iconBtn,
                 background: queued ? "var(--primary-50, #E8F0FE)" : "transparent",
                 color: queued ? "var(--primary-500)" : "var(--text-tertiary)",
               }}
               onMouseEnter={(e) => { if (!queued) e.currentTarget.style.color = "var(--primary-500)"; }}
               onMouseLeave={(e) => { if (!queued) e.currentTarget.style.color = "var(--text-tertiary)"; }}
             >
-              <Icon name="TimerProperty1Bold" size={15} />
+              <Icon name="TimerProperty1Bold" size={18} />
             </button>
           )}
           <button
             onClick={() => setEditing(true)}
             title="Edit task — checklist, notes, dates"
             aria-label={`Edit task ${task.title}`}
-            style={{ ...trigger, padding: "3px 4px", color: "var(--text-tertiary)" }}
+            style={{ ...iconBtn, color: "var(--text-tertiary)" }}
             onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
           >
-            <Icon name="EditProperty1Linear" size={15} />
+            <Icon name="EditProperty1Linear" size={18} />
           </button>
           <button
             onClick={() => {
@@ -280,11 +289,11 @@ export default function TaskRow({
             }}
             title="Delete task"
             aria-label={`Delete task ${task.title}`}
-            style={{ ...trigger, padding: "3px 4px", color: "var(--text-tertiary)" }}
+            style={{ ...iconBtn, color: "var(--text-tertiary)" }}
             onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red-500)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
           >
-            <Icon name="TrashProperty1Linear" size={15} />
+            <Icon name="TrashProperty1Linear" size={18} />
           </button>
         </span>
       </div>

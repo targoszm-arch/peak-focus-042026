@@ -44,6 +44,9 @@ export function useKeyboardSnapback() {
     let shrunk = false; // whether --pf-vvh is currently applied
     let revealTimer: number | undefined;
     let syncTimer: number | undefined;
+    // The list scroll position from before reveal() moved it, so dismissing
+    // the keyboard returns the page to exactly where the user left it.
+    let savedScroll: { el: HTMLElement; top: number } | null = null;
 
     const pin = () => {
       if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
@@ -68,6 +71,10 @@ export function useKeyboardSnapback() {
         root.classList.remove(KB_CLASS);
       }
       pin();
+      if (savedScroll) {
+        savedScroll.el.scrollTo({ top: savedScroll.top, behavior: "smooth" });
+        savedScroll = null;
+      }
     };
 
     let ambiguousSince = 0;
@@ -81,7 +88,12 @@ export function useKeyboardSnapback() {
         root.style.setProperty(VAR, `${Math.round(vv.height)}px`);
         root.classList.add(KB_CLASS);
         pin();
-        if (!shrunk) scheduleReveal(80);
+        if (!shrunk) {
+          // Remember where the main scroller was before reveal() moves it.
+          const scroller = (document.activeElement as HTMLElement).closest(".pf-scroll");
+          if (scroller instanceof HTMLElement) savedScroll = { el: scroller, top: scroller.scrollTop };
+          scheduleReveal(80);
+        }
         shrunk = true;
         return;
       }

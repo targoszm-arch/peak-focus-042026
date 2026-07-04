@@ -110,8 +110,8 @@ export function ModalShell({
             <Icon name={icon} size={18} />
           </span>
           <span style={{ flex: 1, fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 800, color: "var(--text-primary)" }}>{title}</span>
-          <button onClick={onClose} title="Close" style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", padding: 2 }}>
-            <Icon name="CloseCircleProperty1Linear" size={22} />
+          <button onClick={onClose} title="Close" style={{ border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, margin: -8, flexShrink: 0 }}>
+            <Icon name="CloseCircleProperty1Linear" size={24} />
           </button>
         </div>
         <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", flex: 1 }}>{children}</div>
@@ -139,11 +139,14 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
   const [assignees, setAssigneesLocal] = useState<string[]>(assigneesByTask[task.id] ?? []);
   const [draft, setDraft] = useState("");
 
-  // Focus without letting iOS force-scroll the document toward the input —
-  // the keyboard hook shrinks the shell and reveals it instead.
+  // Auto-focus only with a physical pointer. On touch, focusing on open
+  // brings the keyboard up immediately and hides half the form behind it —
+  // the modal should open whole, with the keyboard appearing on tap.
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    titleRef.current?.focus({ preventScroll: true });
+    if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      titleRef.current?.focus({ preventScroll: true });
+    }
   }, []);
 
   // Checklist steps are live child tasks — edits persist immediately.
@@ -275,12 +278,17 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
           {checklist.map((c) => (
             <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 8px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)" }}>
               <button onClick={() => void toggleTask(c.id)} title={c.completed ? "Mark not done" : "Mark done"} style={{
-                flexShrink: 0, width: 20, height: 20, borderRadius: "var(--radius-sm)", cursor: "pointer",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                border: "1.5px solid " + (c.completed ? "var(--primary-500)" : "var(--border-strong)"),
-                background: c.completed ? "var(--primary-500)" : "transparent", color: "#fff", padding: 0,
+                flexShrink: 0, width: 40, height: 40, margin: "-7px 0", border: "none", background: "transparent",
+                cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 0,
               }}>
-                {c.completed && <Icon name="TickCircleProperty1Bold" size={14} />}
+                <span style={{
+                  width: 24, height: 24, borderRadius: "var(--radius-sm)",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  border: "1.5px solid " + (c.completed ? "var(--primary-500)" : "var(--border-strong)"),
+                  background: c.completed ? "var(--primary-500)" : "transparent", color: "#fff",
+                }}>
+                  {c.completed && <Icon name="TickCircleProperty1Bold" size={16} />}
+                </span>
               </button>
               <input
                 defaultValue={c.title}
@@ -297,8 +305,8 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
                   textDecoration: c.completed ? "line-through" : "none",
                 }}
               />
-              <button onClick={() => void removeTask(c.id)} title="Remove step" style={{ flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", padding: 2 }}>
-                <Icon name="CloseCircleProperty1Linear" size={17} />
+              <button onClick={() => void removeTask(c.id)} title="Remove step" style={{ flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, margin: "-7px -8px -7px 0", padding: 0 }}>
+                <Icon name="CloseCircleProperty1Linear" size={20} />
               </button>
             </div>
           ))}

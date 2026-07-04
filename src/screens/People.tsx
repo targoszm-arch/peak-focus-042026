@@ -156,11 +156,11 @@ export default function People() {
                 <button
                   onClick={() => setModal({ member: p })}
                   title="Edit person"
-                  style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  style={{ width: 40, height: 40, borderRadius: "var(--radius-sm)", border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = "var(--primary-500)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
                 >
-                  <Icon name="EditProperty1Linear" size={17} />
+                  <Icon name="EditProperty1Linear" size={19} />
                 </button>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--font-sans)", fontSize: 12.5, color: "var(--text-tertiary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
