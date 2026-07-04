@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@/ds";
 import { useTasks, type Task, type Priority, INBOX_ID } from "@/hooks/use-tasks";
 import { useProjects, type ProjectFull } from "@/hooks/use-projects";
@@ -82,7 +83,10 @@ export function ModalShell({
   footer: React.ReactNode;
   width?: number;
 }) {
-  return (
+  // Portaled to <body>: keeps the fixed overlay independent of the shell
+  // (which shrinks while the keyboard is open) and of list re-renders that
+  // could unmount the row the modal was opened from.
+  return createPortal(
     <div onClick={onClose} style={overlay}>
       <div
         onClick={(e) => e.stopPropagation()}
@@ -113,7 +117,8 @@ export function ModalShell({
         <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", flex: 1 }}>{children}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 20px", borderTop: "1px solid var(--border-soft)", background: "var(--surface-sunken)", flexShrink: 0 }}>{footer}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -133,6 +138,13 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
   const [notes, setNotes] = useState(task.notes ?? "");
   const [assignees, setAssigneesLocal] = useState<string[]>(assigneesByTask[task.id] ?? []);
   const [draft, setDraft] = useState("");
+
+  // Focus without letting iOS force-scroll the document toward the input —
+  // the keyboard hook shrinks the shell and reveals it instead.
+  const titleRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    titleRef.current?.focus({ preventScroll: true });
+  }, []);
 
   // Checklist steps are live child tasks — edits persist immediately.
   const checklist = childrenByParent[task.id] ?? [];
@@ -185,7 +197,7 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
     }>
       <div>
         <label style={fieldLabel}>Task</label>
-        <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void save(); }} style={inputStyle} placeholder="Task name" />
+        <input ref={titleRef} value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void save(); }} style={inputStyle} placeholder="Task name" />
       </div>
 
       <div>
