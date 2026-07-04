@@ -126,7 +126,7 @@ export function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t:
    task lists like Tasks and a project's To do/Done sections. ── */
 export function TaskCardGrid({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, maxWidth: 900 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12 }}>
       {tasks.map((t) => <PFTaskCard key={t.id} task={t} onOpen={onOpen} dragging={false} />)}
     </div>
   );

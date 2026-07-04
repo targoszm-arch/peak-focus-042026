@@ -88,7 +88,7 @@ export default function Projects() {
   const visible = withStat.filter((p) => !finishedIds.has(p.id) && match(p));
   const favourites = visible.filter((p) => starred.has(p.id));
 
-  const projectRow = (p: (typeof withStat)[number], sec: SectionKey) => {
+  const projectCard = (p: (typeof withStat)[number], sec: SectionKey) => {
     const c = clientById.get(p.clientId ?? "");
     const color = c?.color ?? p.color;
     const s = p.s;
@@ -99,41 +99,44 @@ export default function Projects() {
         key={sec + "-" + p.id}
         onClick={() => navigate(`/projects/${p.id}`)}
         style={{
-          display: "flex", alignItems: "center", gap: 13, width: "100%", textAlign: "left",
-          cursor: "pointer", padding: "11px 12px", borderRadius: "var(--radius-md)",
-          border: "1px solid transparent", background: "transparent",
-          transition: "background .13s, border-color .13s",
+          display: "flex", flexDirection: "column", gap: 10, textAlign: "left",
+          cursor: "pointer", padding: "13px 14px", borderRadius: "var(--radius-lg)",
+          border: "1px solid var(--border-soft)", background: "var(--surface-card)",
+          transition: "background .13s, border-color .13s, box-shadow .13s",
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = `color-mix(in srgb, ${cfg.tint} 8%, white)`; e.currentTarget.style.borderColor = `color-mix(in srgb, ${cfg.tint} 20%, var(--border-soft))`; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "transparent"; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = `color-mix(in srgb, ${cfg.tint} 6%, white)`; e.currentTarget.style.borderColor = `color-mix(in srgb, ${cfg.tint} 30%, var(--border-strong))`; e.currentTarget.style.boxShadow = "var(--shadow-sm)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "var(--surface-card)"; e.currentTarget.style.borderColor = "var(--border-soft)"; e.currentTarget.style.boxShadow = "none"; }}
       >
-        <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: "var(--radius-md)", background: `color-mix(in srgb, ${color} 15%, white)`, color, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 800 }}>
-          {(c?.name ?? p.name).slice(0, 1).toUpperCase()}
+        <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ width: 40, height: 40, flexShrink: 0, borderRadius: "var(--radius-md)", background: `color-mix(in srgb, ${color} 15%, white)`, color, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 800 }}>
+            {(c?.name ?? p.name).slice(0, 1).toUpperCase()}
+          </span>
+          <span style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 700, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+            <span style={{ fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c?.name ?? "No client"}</span>
+          </span>
+          <span
+            role="button"
+            title={isStar ? "Remove from favourites" : "Add to favourites"}
+            onClick={(e) => { e.stopPropagation(); toggleStar(p.id); }}
+            style={{ flexShrink: 0, width: 36, height: 36, margin: "-6px -6px -6px 0", borderRadius: "var(--radius-sm)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: isStar ? "var(--yellow-500, #E6A609)" : "var(--text-tertiary)" }}
+          >
+            <Icon name={isStar ? "StarProperty1Bold" : "StarProperty1Linear"} size={18} />
+          </span>
         </span>
-        <span style={{ minWidth: 0, flex: "1 1 200px", display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 700, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
-          <span style={{ fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c?.name ?? "No client"}</span>
-        </span>
-        <span style={{ flex: "0 1 150px", minWidth: 96, display: "none", flexDirection: "column", gap: 5 }} className="pf-proj-progress">
+        <span style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <span style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
             <span>{s.completed}/{s.total}</span>
             <span>{s.pct}%</span>
           </span>
           <ProgressBar value={s.pct} height={6} tone={s.pct === 100 ? "success" : "primary"} />
         </span>
-        <span style={{ flexShrink: 0, display: "none", alignItems: "center", gap: 5, fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, color: s.openDue > 0 ? "var(--red-500)" : "var(--text-tertiary)" }} className="pf-proj-due">
-          <Icon name="CalendarProperty1Linear" size={13} /> {dueLabel(p.due)}
-        </span>
-        <span style={{ flexShrink: 0, display: "none" }} className="pf-proj-team">
-          {s.team.length > 0 && <AvatarGroup users={s.team.map((a) => ({ name: a.name }))} size={24} max={3} />}
-        </span>
-        <span
-          role="button"
-          title={isStar ? "Remove from favourites" : "Add to favourites"}
-          onClick={(e) => { e.stopPropagation(); toggleStar(p.id); }}
-          style={{ flexShrink: 0, width: 40, height: 40, margin: "-5px 0", borderRadius: "var(--radius-sm)", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: isStar ? "var(--yellow-500, #E6A609)" : "var(--text-tertiary)" }}
-        >
-          <Icon name={isStar ? "StarProperty1Bold" : "StarProperty1Linear"} size={19} />
+        <span style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 4 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, color: s.openDue > 0 ? "var(--red-500)" : "var(--text-tertiary)" }}>
+            <Icon name="CalendarProperty1Linear" size={13} /> {dueLabel(p.due)}
+          </span>
+          <span style={{ flex: 1 }} />
+          {s.team.length > 0 && <AvatarGroup users={s.team.map((a) => ({ name: a.name }))} size={22} max={3} />}
         </span>
       </button>
     );
@@ -159,9 +162,9 @@ export default function Projects() {
           </span>
         </button>
         {!isCollapsed && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>
+          <div style={{ display: list.length > 0 ? "grid" : "block", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 8, marginTop: 4, padding: 4 }}>
             {list.length > 0
-              ? list.map((p) => projectRow(p, key))
+              ? list.map((p) => projectCard(p, key))
               : <div style={{ padding: "10px 12px", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-tertiary)" }}>{emptyText}</div>}
           </div>
         )}
@@ -171,8 +174,6 @@ export default function Projects() {
 
   return (
     <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
-      <style>{`@media (min-width: 720px){ .pf-proj-progress{display:flex !important;} } @media (min-width: 860px){ .pf-proj-due{display:inline-flex !important;} } @media (min-width: 980px){ .pf-proj-team{display:inline-flex !important;} }`}</style>
-
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-primary)" }}>Projects</h1>
