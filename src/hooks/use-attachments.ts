@@ -14,7 +14,7 @@ export type Attachment = {
 };
 
 const BUCKET = "attachments";
-const MAX_BYTES = 25 * 1024 * 1024; // matches the bucket's file_size_limit
+const MAX_BYTES = 50 * 1024 * 1024; // matches the bucket's file_size_limit
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function rowToAttachment(r: any): Attachment {
@@ -72,7 +72,7 @@ export function useAttachments(owner: { taskId?: string; projectId?: string }) {
       const list = Array.from(files);
       const oversized = list.find((f) => f.size > MAX_BYTES);
       if (oversized) {
-        setError(`"${oversized.name}" is over the 25 MB limit`);
+        setError(`"${oversized.name}" is over the 50 MB limit`);
         return;
       }
       setUploading(true);
