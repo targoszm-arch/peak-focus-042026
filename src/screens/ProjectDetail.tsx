@@ -36,7 +36,7 @@ export default function ProjectDetail() {
 
   if (!project) {
     return (
-      <div className="pf-page" style={{ maxWidth: 1120, margin: "0 auto", padding: "28px 32px" }}>
+      <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px" }}>
         <p style={{ color: "var(--text-secondary)", fontSize: 14 }}>
           Project not found.{" "}
           <button onClick={() => navigate("/projects")} style={{ border: "none", background: "none", color: "var(--primary-500)", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
@@ -58,7 +58,7 @@ export default function ProjectDetail() {
   );
 
   return (
-    <div className="pf-page" style={{ maxWidth: 1120, margin: "0 auto", padding: "24px 32px 48px", display: "flex", flexDirection: "column", gap: 22 }}>
+    <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "24px 32px 48px", display: "flex", flexDirection: "column", gap: 22 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <button onClick={() => navigate("/projects")} style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-secondary)", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600 }}>
           <Icon name="ArrowLeftProperty1Linear" size={16} /> Projects

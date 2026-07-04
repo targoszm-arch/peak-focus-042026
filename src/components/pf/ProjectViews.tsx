@@ -176,22 +176,22 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
   max = new Date(max.getTime() + dayMs);
   const spanDays = Math.round((max.getTime() - min.getTime()) / dayMs) + 1;
   const days = Array.from({ length: spanDays }, (_, i) => new Date(min.getTime() + i * dayMs));
-  const dayW = 46, labelW = 200, rowH = 46;
+  const dayW = 46, labelW = 300, rowH = 46;
   const todayIdx = Math.round((startOfDay(new Date()).getTime() - min.getTime()) / dayMs);
   const statusColor = (t: Task) => PF_STATUS.find((s) => s.id === t.status)?.dot ?? "var(--primary-500)";
 
   return (
     <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
-        <div style={{ minWidth: labelW + spanDays * dayW }}>
+        <div style={{ minWidth: `max(100%, ${labelW + spanDays * dayW}px)` }}>
           <div style={{ display: "flex", borderBottom: "1px solid var(--border-soft)" }}>
             <div style={{ width: labelW, flexShrink: 0, padding: "10px 16px", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-tertiary)", borderRight: "1px solid var(--border-soft)" }}>Task</div>
-            <div style={{ display: "flex" }}>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, flex: 1, minWidth: 0 }}>
               {days.map((d, i) => {
                 const isToday = i === todayIdx;
                 const weekend = [0, 6].includes(d.getDay());
                 return (
-                  <div key={i} style={{ width: dayW, flexShrink: 0, textAlign: "center", padding: "7px 0", background: weekend ? "var(--surface-page)" : "transparent" }}>
+                  <div key={i} style={{ minWidth: dayW, textAlign: "center", padding: "7px 0", background: weekend ? "var(--surface-page)" : "transparent" }}>
                     <div style={{ fontFamily: "var(--font-sans)", fontSize: 10, fontWeight: 700, color: isToday ? "var(--primary-500)" : "var(--text-tertiary)", textTransform: "uppercase" }}>
                       {d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2)}
                     </div>
@@ -203,26 +203,26 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
           </div>
           <div style={{ position: "relative" }}>
             {todayIdx >= 0 && todayIdx < spanDays && (
-              <div style={{ position: "absolute", top: 0, bottom: 0, left: labelW + todayIdx * dayW + dayW / 2, width: 2, background: "color-mix(in srgb, var(--primary-500) 55%, transparent)", zIndex: 1, pointerEvents: "none" }} />
+              <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(${labelW}px + ((100% - ${labelW}px) / ${spanDays}) * ${todayIdx + 0.5})`, width: 2, background: "color-mix(in srgb, var(--primary-500) 55%, transparent)", zIndex: 1, pointerEvents: "none" }} />
             )}
             {dated.map((t) => {
               const s = startOf(t), e = endOf(t);
-              const left = Math.round((s.getTime() - min.getTime()) / dayMs) * dayW;
-              const width = (Math.round((e.getTime() - s.getTime()) / dayMs) + 1) * dayW;
+              const startIndex = Math.round((s.getTime() - min.getTime()) / dayMs);
+              const duration = Math.round((e.getTime() - s.getTime()) / dayMs) + 1;
               const col = statusColor(t);
               return (
                 <div key={t.id} style={{ display: "flex", alignItems: "center", height: rowH, borderBottom: "1px solid var(--border-soft)" }}>
-                  <div style={{ width: labelW, flexShrink: 0, padding: "0 16px", borderRight: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 7, height: "100%" }}>
+                  <div onClick={() => onOpen(t)} title="Open task" style={{ width: labelW, flexShrink: 0, padding: "0 16px", borderRight: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 7, height: "100%", cursor: "pointer" }}>
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: col, flexShrink: 0 }} />
                     <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: t.completed ? "line-through" : "none" }}>{t.title}</span>
                   </div>
-                  <div style={{ position: "relative", height: "100%", flex: 1 }}>
+                  <div style={{ position: "relative", height: "100%", flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, alignItems: "center" }}>
                     <div
-                      onClick={() => onOpen(t)}
+                      onClick={(e) => { e.stopPropagation(); onOpen(t); }}
                       title={`${t.title} · ${dueLabel(t.endsAt)}`}
                       style={{
-                        position: "absolute", top: "50%", transform: "translateY(-50%)",
-                        left: left + 5, width: Math.max(width - 10, 24), height: 22,
+                        gridColumn: `${startIndex + 1} / span ${duration}`, height: 22,
+                        margin: "0 5px", minWidth: 24,
                         borderRadius: "var(--radius-full)", cursor: "pointer",
                         background: `color-mix(in srgb, ${col} 20%, white)`,
                         border: `1.5px solid ${col}`, display: "flex", alignItems: "center", paddingLeft: 8, gap: 5, overflow: "hidden",
@@ -259,7 +259,7 @@ const calBtn: React.CSSProperties = {
   color: "var(--text-secondary)", cursor: "pointer", flexShrink: 0,
 };
 
-export function CalendarView({ tasks }: { tasks: Task[] }) {
+export function CalendarView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void }) {
   const base = new Date();
   const [month, setMonth] = useState(() => new Date(base.getFullYear(), base.getMonth(), 1));
   const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -299,7 +299,7 @@ export function CalendarView({ tasks }: { tasks: Task[] }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
           {cells.map((d, i) => {
-            if (!d) return <div key={i} style={{ minHeight: 96, borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none", borderBottom: "1px solid var(--border-soft)", background: "var(--surface-page)" }} />;
+            if (!d) return <div key={i} style={{ minHeight: 132, borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none", borderBottom: "1px solid var(--border-soft)", background: "var(--surface-page)" }} />;
             const di = iso(d);
             const list = tasksOn(d);
             const isToday = di === todayIso;
@@ -310,7 +310,7 @@ export function CalendarView({ tasks }: { tasks: Task[] }) {
                 key={i}
                 onClick={() => setSelected(di)}
                 style={{
-                  minHeight: 96, padding: 7, cursor: "pointer",
+                  minHeight: 132, padding: 7, cursor: "pointer",
                   borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none",
                   borderBottom: "1px solid var(--border-soft)",
                   background: isSel ? "color-mix(in srgb, var(--primary-500) 8%, white)" : weekend ? "var(--surface-page)" : "var(--surface-card)",
@@ -329,9 +329,14 @@ export function CalendarView({ tasks }: { tasks: Task[] }) {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {list.slice(0, 3).map((t) => (
-                    <div key={t.id} title={t.title} style={{ display: "flex", alignItems: "center", gap: 5, padding: "2px 6px", borderRadius: "var(--radius-sm)", background: `color-mix(in srgb, ${statusColor(t)} 13%, white)`, overflow: "hidden" }}>
-                      <span style={{ width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: statusColor(t) }} />
-                      <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textDecoration: t.completed ? "line-through" : "none" }}>{t.title}</span>
+                    <div
+                      key={t.id}
+                      title={`Open ${t.title}`}
+                      onClick={(e) => { e.stopPropagation(); onOpen(t); }}
+                      style={{ display: "flex", alignItems: "flex-start", gap: 5, minHeight: 34, height: 34, padding: "3px 6px", borderRadius: "var(--radius-sm)", background: `color-mix(in srgb, ${statusColor(t)} 13%, white)`, overflow: "hidden", cursor: "pointer" }}
+                    >
+                      <span style={{ width: 5, height: 5, marginTop: 5, borderRadius: "50%", flexShrink: 0, background: statusColor(t) }} />
+                      <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, lineHeight: 1.25, color: "var(--text-primary)", whiteSpace: "normal", overflow: "hidden", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", textDecoration: t.completed ? "line-through" : "none" }}>{t.title}</span>
                     </div>
                   ))}
                   {list.length > 3 && <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)", paddingLeft: 6 }}>+{list.length - 3} more</span>}

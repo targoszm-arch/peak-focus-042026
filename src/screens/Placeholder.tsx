@@ -11,7 +11,7 @@ export default function Placeholder({
   blurb?: string;
 }) {
   return (
-    <div className="pf-page" style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px 56px" }}>
+    <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 56px" }}>
       <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "var(--text-primary)" }}>{title}</h1>
       <Card padding={28} style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 16 }}>
         <span
