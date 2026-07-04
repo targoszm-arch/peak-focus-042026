@@ -88,6 +88,11 @@ export default function Projects() {
   const visible = withStat.filter((p) => !finishedIds.has(p.id) && match(p));
   const favourites = visible.filter((p) => starred.has(p.id));
 
+  // Board/Timeline/Calendar don't have their own project rows to filter — apply
+  // the same search here so switching views doesn't make the search box go dead.
+  const matchingProjectIds = new Set(projects.filter(match).map((p) => p.id));
+  const searchedProjectTasks = q ? projectTasks.filter((t) => matchingProjectIds.has(t.projectId)) : projectTasks;
+
   const projectCard = (p: (typeof withStat)[number], sec: SectionKey) => {
     const c = clientById.get(p.clientId ?? "");
     const color = c?.color ?? p.color;
@@ -207,9 +212,9 @@ export default function Projects() {
         ))}
       </div>
 
-      {view === "board" && <KanbanView tasks={projectTasks} onOpen={setEditTask} />}
-      {view === "timeline" && <TimelineView tasks={projectTasks} onOpen={setEditTask} />}
-      {view === "calendar" && <CalendarView tasks={projectTasks} onOpen={setEditTask} />}
+      {view === "board" && <KanbanView tasks={searchedProjectTasks} onOpen={setEditTask} />}
+      {view === "timeline" && <TimelineView tasks={searchedProjectTasks} onOpen={setEditTask} />}
+      {view === "calendar" && <CalendarView tasks={searchedProjectTasks} onOpen={setEditTask} />}
 
       {view === "list" && (
         <>

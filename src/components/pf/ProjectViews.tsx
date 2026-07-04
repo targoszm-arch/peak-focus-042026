@@ -224,7 +224,7 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
   max = new Date(max.getTime() + dayMs);
   const spanDays = Math.round((max.getTime() - min.getTime()) / dayMs) + 1;
   const days = Array.from({ length: spanDays }, (_, i) => new Date(min.getTime() + i * dayMs));
-  const dayW = 46, rowH = 46;
+  const dayW = 58, rowH = 46;
   const todayIdx = Math.round((now.getTime() - min.getTime()) / dayMs);
 
   // Group consecutive days into month segments for the header's month row.
@@ -288,12 +288,17 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
         <div style={{ minWidth: `max(100%, ${labelW + spanDays * dayW}px)`, position: "relative" }}>
           {/* drag handle to resize the label column, spanning header + all rows */}
           <div
-            onPointerDown={(e) => { e.preventDefault(); dragRef.current = { startX: e.clientX, startW: labelW }; }}
+            onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = { startX: e.clientX, startW: labelW }; }}
             title="Drag to resize"
-            style={{ position: "absolute", top: 0, bottom: 0, left: labelW - 3, width: 6, cursor: "col-resize", zIndex: 6, background: "transparent" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--primary-500) 35%, transparent)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-          />
+            style={{
+              position: "absolute", top: 0, bottom: 0, left: labelW - 4, width: 8, cursor: "col-resize", zIndex: 20,
+              touchAction: "none", display: "flex", justifyContent: "center",
+            }}
+            onMouseEnter={(e) => { (e.currentTarget.firstChild as HTMLElement).style.background = "var(--primary-500)"; }}
+            onMouseLeave={(e) => { (e.currentTarget.firstChild as HTMLElement).style.background = "var(--border-strong)"; }}
+          >
+            <span style={{ width: 2, height: "100%", background: "var(--border-strong)", pointerEvents: "none" }} />
+          </div>
           <div style={{ borderBottom: "1px solid var(--border-soft)" }}>
             <div style={{ display: "flex", borderBottom: "1px solid var(--border-soft)" }}>
               <div style={{ ...stickyLabelCell, width: labelW, flexShrink: 0, borderRight: "1px solid var(--border-soft)" }} />
@@ -362,16 +367,16 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
                           onClick={(e) => { e.stopPropagation(); onOpen(t); }}
                           title={`${t.title} · ${dueLabel(t.endsAt)}`}
                           style={{
-                            gridColumn: `${startIndex + 1} / span ${duration}`, height: 22,
-                            margin: "0 5px", minWidth: 24,
+                            gridColumn: `${startIndex + 1} / span ${duration}`, height: 23,
+                            margin: "0 3px", minWidth: 40, position: "relative", zIndex: 2,
                             borderRadius: "var(--radius-full)", cursor: "pointer",
                             background: `color-mix(in srgb, ${col} 20%, white)`,
-                            border: `1.5px solid ${col}`, display: "flex", alignItems: "center", paddingLeft: 8, gap: 5, overflow: "hidden",
+                            border: `1.5px solid ${col}`, display: "flex", alignItems: "center", justifyContent: "center", paddingLeft: 6, paddingRight: 6, gap: 4, overflow: "hidden",
                           }}
                         >
                           {t.completed && <Icon name="TickCircleProperty1Bold" size={13} style={{ color: col, flexShrink: 0 }} />}
                           <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: `color-mix(in srgb, ${col} 72%, black)`, whiteSpace: "nowrap" }}>
-                            {status.title} · {parseDay(t.endsAt)!.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            {status.title}
                           </span>
                         </div>
                       </div>
