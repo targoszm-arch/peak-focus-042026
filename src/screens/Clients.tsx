@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Icon, Badge } from "@/ds";
+import { Icon, Badge, StatCard } from "@/ds";
 import { useClients, type Client, type ClientHealth } from "@/hooks/use-clients";
 import { useProjects } from "@/hooks/use-projects";
 import { daysFromToday } from "@/lib/pfdate";
@@ -153,16 +153,9 @@ export default function Clients() {
   const atRisk = clients.filter((c) => c.health !== "Healthy").length;
   const renewalsSoon = clients.filter((c) => c.renewal && daysFromToday(c.renewal) >= 0 && daysFromToday(c.renewal) <= 90).length;
 
-  const metrics = [
-    { label: "Active accounts", value: String(clients.length).padStart(2, "0"), icon: "CategoryProperty1Bold", tone: "var(--primary-500)", detail: `${clients.length} client${clients.length === 1 ? "" : "s"} in your book` },
-    { label: "Managed ARR", value: money(totalArr), icon: "ChartProperty1Bold", tone: "var(--green-600, #2A9E75)", detail: "Across the full portfolio" },
-    { label: "Renewals in 90 days", value: String(renewalsSoon).padStart(2, "0"), icon: "CalendarProperty1Bold", tone: "var(--secondary-500)", detail: renewalsSoon ? "Coming up soon" : "Nothing due soon" },
-    { label: "Accounts at risk", value: String(atRisk).padStart(2, "0"), icon: "FlagProperty1Bold", tone: "var(--red-500)", detail: atRisk ? "Watch or at-risk health" : "All healthy" },
-  ];
-
   return (
     <div className="pf-page" style={{ width: "100%", maxWidth: 1200, margin: "0 auto", boxSizing: "border-box", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
-      <style>{`.pf-cl-metrics{display:grid;grid-template-columns:1fr;gap:14px;} @media (min-width:640px){ .pf-cl-metrics{grid-template-columns:repeat(2,1fr);} } @media (min-width:1080px){ .pf-cl-metrics{grid-template-columns:repeat(4,1fr);} } .pf-cl-head{display:none;} @media (min-width:760px){ .pf-cl-head{display:grid;} .pf-cl-row{grid-template-columns:1.6fr 1.2fr .8fr .8fr .7fr .7fr 40px !important;} .pf-cl-cell{display:block !important;} }`}</style>
+      <style>{`.pf-cl-head{display:none;} @media (min-width:760px){ .pf-cl-head{display:grid;} .pf-cl-row{grid-template-columns:1.6fr 1.2fr .8fr .8fr .7fr .7fr 40px !important;} .pf-cl-cell{display:block !important;} }`}</style>
 
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
@@ -174,22 +167,12 @@ export default function Clients() {
         </button>
       </div>
 
-      <div className="pf-cl-metrics">
-        {metrics.map((m) => (
-          <div key={m.label} style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>{m.label}</div>
-                <div style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-primary)", marginTop: 8 }}>{m.value}</div>
-              </div>
-              <span style={{ width: 44, height: 44, flexShrink: 0, borderRadius: "var(--radius-lg)", background: `color-mix(in srgb, ${m.tone} 13%, white)`, color: m.tone, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon name={m.icon} size={22} />
-              </span>
-            </div>
-            <div style={{ height: 1, background: "var(--border-soft)" }} />
-            <div style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, color: "var(--text-tertiary)" }}>{m.detail}</div>
-          </div>
-        ))}
+      {/* Same stat-card grid as Today/Dashboard — two columns on phones. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
+        <StatCard icon={<Icon name="CategoryProperty1Bold" size={20} />} label="Active accounts" value={clients.length} iconTone="primary" />
+        <StatCard icon={<Icon name="ChartProperty1Bold" size={20} />} label="Managed ARR" value={money(totalArr)} iconTone="success" />
+        <StatCard icon={<Icon name="CalendarProperty1Bold" size={20} />} label="Renewals in 90 days" value={renewalsSoon} iconTone="accent" />
+        <StatCard icon={<Icon name="FlagProperty1Bold" size={20} />} label="Accounts at risk" value={atRisk} iconTone="accent" />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, height: 42, padding: "0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)" }}>
