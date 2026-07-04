@@ -280,25 +280,18 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
     .sort((a, b) => a.meta.name.localeCompare(b.meta.name));
 
   // Frozen (sticky) so the task name stays visible while scrolling through days.
-  const stickyLabelCell: React.CSSProperties = { position: "sticky", left: 0, zIndex: 2, background: "var(--surface-card)" };
+  // zIndex 3 keeps it above the day-grid's task bars (2) and the today marker (1).
+  const stickyLabelCell: React.CSSProperties = { position: "sticky", left: 0, zIndex: 3, background: "var(--surface-card)" };
 
   return (
     <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", overflow: "hidden" }}>
-      <div ref={scrollRef} onScroll={(e) => { timelineScrollLeft = e.currentTarget.scrollLeft; }} style={{ overflowX: "auto" }}>
-        <div style={{ minWidth: `max(100%, ${labelW + spanDays * dayW}px)`, position: "relative" }}>
-          {/* drag handle to resize the label column, spanning header + all rows */}
-          <div
-            onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = { startX: e.clientX, startW: labelW }; }}
-            title="Drag to resize"
-            style={{
-              position: "absolute", top: 0, bottom: 0, left: labelW - 4, width: 8, cursor: "col-resize", zIndex: 20,
-              touchAction: "none", display: "flex", justifyContent: "center",
-            }}
-            onMouseEnter={(e) => { (e.currentTarget.firstChild as HTMLElement).style.background = "var(--primary-500)"; }}
-            onMouseLeave={(e) => { (e.currentTarget.firstChild as HTMLElement).style.background = "var(--border-strong)"; }}
-          >
-            <span style={{ width: 2, height: "100%", background: "var(--border-strong)", pointerEvents: "none" }} />
-          </div>
+      {/* Wraps only the scrolling table (not the legend below) so the resize
+          handle, positioned relative to this non-scrolling wrapper rather than
+          the horizontally-scrolling content, stays aligned with the frozen
+          Task column instead of scrolling away with the days. */}
+      <div style={{ position: "relative" }}>
+        <div ref={scrollRef} onScroll={(e) => { timelineScrollLeft = e.currentTarget.scrollLeft; }} style={{ overflowX: "auto" }}>
+          <div style={{ minWidth: `max(100%, ${labelW + spanDays * dayW}px)`, position: "relative" }}>
           <div style={{ borderBottom: "1px solid var(--border-soft)" }}>
             <div style={{ display: "flex", borderBottom: "1px solid var(--border-soft)" }}>
               <div style={{ ...stickyLabelCell, width: labelW, flexShrink: 0, borderRight: "1px solid var(--border-soft)" }} />
@@ -343,7 +336,7 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
             {groups.map((g, gi) => (
               <Fragment key={g.key}>
                 <div style={{ display: "flex", alignItems: "center", height: 32, background: "var(--surface-sunken)", borderBottom: "1px solid var(--border-soft)", borderTop: gi > 0 ? "1px solid var(--border-soft)" : "none" }}>
-                  <div style={{ position: "sticky", left: 0, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 16px", zIndex: 2 }}>
+                  <div style={{ position: "sticky", left: 0, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 16px", zIndex: 3 }}>
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: g.meta.color, flexShrink: 0 }} />
                     <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)", whiteSpace: "nowrap" }}>{g.meta.name}</span>
                     <span style={{ fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)" }}>{g.items.length}</span>
@@ -386,6 +379,22 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
               </Fragment>
             ))}
           </div>
+          </div>
+        </div>
+        {/* drag handle to resize the label column — positioned relative to this
+            non-scrolling wrapper (not the scrolled content) so it stays aligned
+            with the frozen Task column regardless of horizontal scroll */}
+        <div
+          onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); dragRef.current = { startX: e.clientX, startW: labelW }; }}
+          title="Drag to resize"
+          style={{
+            position: "absolute", top: 0, bottom: 0, left: labelW - 4, width: 8, cursor: "col-resize", zIndex: 20,
+            touchAction: "none", display: "flex", justifyContent: "center",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget.firstChild as HTMLElement).style.background = "var(--primary-500)"; }}
+          onMouseLeave={(e) => { (e.currentTarget.firstChild as HTMLElement).style.background = "var(--border-strong)"; }}
+        >
+          <span style={{ width: 2, height: "100%", background: "var(--border-strong)", pointerEvents: "none" }} />
         </div>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, padding: "11px 16px", borderTop: "1px solid var(--border-soft)", background: "var(--surface-page)" }}>
@@ -447,7 +456,7 @@ export function CalendarView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
           {cells.map((d, i) => {
-            if (!d) return <div key={i} style={{ minHeight: 132, borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none", borderBottom: "1px solid var(--border-soft)", background: "var(--surface-page)" }} />;
+            if (!d) return <div key={i} style={{ minHeight: 160, borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none", borderBottom: "1px solid var(--border-soft)", background: "var(--surface-page)" }} />;
             const di = iso(d);
             const list = tasksOn(d);
             const isToday = di === todayIso;
@@ -458,7 +467,7 @@ export function CalendarView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
                 key={i}
                 onClick={() => setSelected(di)}
                 style={{
-                  minHeight: 132, padding: 7, cursor: "pointer",
+                  minHeight: 160, padding: 7, cursor: "pointer",
                   borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none",
                   borderBottom: "1px solid var(--border-soft)",
                   background: isSel ? "color-mix(in srgb, var(--primary-500) 8%, white)" : weekend ? "var(--surface-page)" : "var(--surface-card)",
@@ -475,15 +484,18 @@ export function CalendarView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
                     color: isToday ? "#fff" : "var(--text-secondary)",
                   }}>{d.getDate()}</span>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  {list.slice(0, 3).map((t) => {
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: 120, overflowY: "auto" }}
+                >
+                  {list.map((t) => {
                     const status = statusFor(t);
                     return (
                       <div
                         key={t.id}
                         title={`Open ${t.title} · ${status.title}`}
-                        onClick={(e) => { e.stopPropagation(); onOpen(t); }}
-                        style={{ display: "flex", alignItems: "flex-start", gap: 5, minHeight: 38, height: 38, padding: "3px 6px", borderRadius: "var(--radius-sm)", background: `color-mix(in srgb, ${status.dot} 13%, white)`, overflow: "hidden", cursor: "pointer" }}
+                        onClick={() => onOpen(t)}
+                        style={{ display: "flex", alignItems: "flex-start", gap: 5, minHeight: 38, height: 38, flexShrink: 0, padding: "3px 6px", borderRadius: "var(--radius-sm)", background: `color-mix(in srgb, ${status.dot} 13%, white)`, overflow: "hidden", cursor: "pointer" }}
                       >
                         <span style={{ width: 5, height: 5, marginTop: 5, borderRadius: "50%", flexShrink: 0, background: status.dot }} />
                         <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
@@ -493,7 +505,6 @@ export function CalendarView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
                       </div>
                     );
                   })}
-                  {list.length > 3 && <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)", paddingLeft: 6 }}>+{list.length - 3} more</span>}
                 </div>
               </div>
             );
