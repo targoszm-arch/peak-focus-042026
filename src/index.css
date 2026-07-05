@@ -153,3 +153,8 @@
 .pf-richtext-view ul { margin: 4px 0; padding-left: 22px; list-style: disc; }
 .pf-richtext-view ol { margin: 4px 0; padding-left: 22px; list-style: decimal; }
 .pf-richtext-view p { margin: 0 0 6px; }
+
+/* Attachments "Files" grid — 1 file per row under 1000px so names stay
+   readable in the narrow side panel; 2 per row on wider screens. */
+.pf-files-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 999px) { .pf-files-grid { grid-template-columns: 1fr; } }
