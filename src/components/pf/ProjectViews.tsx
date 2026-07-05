@@ -140,9 +140,12 @@ export function TaskCardGrid({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
 }
 
 /* ══════════ BOARD (kanban) ══════════ */
+const PRIORITY_RANK: Record<string, number> = { high: 0, medium: 1, low: 2, none: 3 };
+
 export function taskCmp(sortKey: string) {
   return (a: Task, b: Task) => {
     if (sortKey === "name") return a.title.localeCompare(b.title);
+    if (sortKey === "priority") return (PRIORITY_RANK[a.priority] ?? 3) - (PRIORITY_RANK[b.priority] ?? 3) || (a.endsAt ?? "9999-99").localeCompare(b.endsAt ?? "9999-99");
     if (sortKey === "progress") return Number(a.completed) - Number(b.completed) || (a.endsAt ?? "9999-99").localeCompare(b.endsAt ?? "9999-99");
     return (a.endsAt ?? "9999-99").localeCompare(b.endsAt ?? "9999-99") || a.title.localeCompare(b.title); // due / client fallback
   };

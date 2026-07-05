@@ -63,13 +63,16 @@ export default function Tasks() {
   }, [rootTasks, q, projectById, clientF, projectF, statusF, priorityF]);
 
   const cmp = useMemo(() => {
+    const clientNameById = new Map(clients.map((c) => [c.id, c.name]));
+    const cname = (t: Task) => clientNameById.get(projectById.get(t.projectId)?.clientId ?? "") ?? "￿";
     return (a: Task, b: Task) => {
       if (sortKey === "priority") return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.title.localeCompare(b.title);
       if (sortKey === "name") return a.title.localeCompare(b.title);
+      if (sortKey === "client") return cname(a).localeCompare(cname(b)) || a.title.localeCompare(b.title);
       if (sortKey === "created") return b.createdAt - a.createdAt;
       return (a.endsAt ?? "9999-99").localeCompare(b.endsAt ?? "9999-99") || a.title.localeCompare(b.title); // due
     };
-  }, [sortKey]);
+  }, [sortKey, clients, projectById]);
 
   const grouped = useMemo(() => {
     const map: Record<string, Task[]> = {};
@@ -142,6 +145,7 @@ export default function Tasks() {
             <option value="due">Sort: Due date</option>
             <option value="priority">Sort: Priority</option>
             <option value="name">Sort: Name</option>
+            <option value="client">Sort: Client</option>
             <option value="created">Sort: Newest</option>
           </select>
         </div>
