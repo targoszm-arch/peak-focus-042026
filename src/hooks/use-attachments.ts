@@ -81,16 +81,23 @@ export function useAttachments(owner: { taskId?: string; projectId?: string }) {
           const path = `${user.id}/${ownerKey}/${Date.now()}-${file.name}`;
           const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
           if (upErr) throw upErr;
-          const { error: insErr } = await supabase.from("attachments").insert({
-            user_id: user.id,
-            task_id: owner.taskId ?? null,
-            project_id: owner.projectId ?? null,
-            file_name: file.name,
-            storage_path: path,
-            mime_type: file.type,
-            size_bytes: file.size,
-          });
+          const { data: row, error: insErr } = await supabase
+            .from("attachments")
+            .insert({
+              user_id: user.id,
+              task_id: owner.taskId ?? null,
+              project_id: owner.projectId ?? null,
+              file_name: file.name,
+              storage_path: path,
+              mime_type: file.type,
+              size_bytes: file.size,
+            })
+            .select("*")
+            .single();
           if (insErr) throw insErr;
+          // Reflect each file the moment it lands so the count isn't stuck at 0
+          // through a large multi-file upload.
+          if (row) setAttachments((prev) => [rowToAttachment(row), ...prev]);
         }
         await reload();
       } catch (e) {
@@ -117,5 +124,5 @@ export function useAttachments(owner: { taskId?: string; projectId?: string }) {
     await supabase.from("attachments").delete().eq("id", a.id);
   }, []);
 
-  return { attachments, loading, uploading, error, upload, download, remove };
+  return { attachments, loading, uploading, error, upload, download, remove, reload };
 }

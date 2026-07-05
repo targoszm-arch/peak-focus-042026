@@ -140,7 +140,15 @@ export function TaskCardGrid({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
 }
 
 /* ══════════ BOARD (kanban) ══════════ */
-export function KanbanView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void }) {
+export function taskCmp(sortKey: string) {
+  return (a: Task, b: Task) => {
+    if (sortKey === "name") return a.title.localeCompare(b.title);
+    if (sortKey === "progress") return Number(a.completed) - Number(b.completed) || (a.endsAt ?? "9999-99").localeCompare(b.endsAt ?? "9999-99");
+    return (a.endsAt ?? "9999-99").localeCompare(b.endsAt ?? "9999-99") || a.title.localeCompare(b.title); // due / client fallback
+  };
+}
+
+export function KanbanView({ tasks, onOpen, sortKey = "due" }: { tasks: Task[]; onOpen: (t: Task) => void; sortKey?: string }) {
   const { updateTaskFields } = useTasks();
   const [over, setOver] = useState<TaskStatus | null>(null);
   const dragId = useRef<string | null>(null);
@@ -149,7 +157,7 @@ export function KanbanView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task)
     <div className="pf-hscroll" style={{ overflowX: "auto", paddingBottom: 6 }}>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${PF_STATUS.length}, minmax(230px, 1fr))`, gap: 14, minWidth: 0 }}>
         {PF_STATUS.map((col) => {
-          const items = tasks.filter((t) => t.status === col.id);
+          const items = tasks.filter((t) => t.status === col.id).sort(taskCmp(sortKey));
           const isOver = over === col.id;
           return (
             <div
@@ -192,7 +200,7 @@ export function KanbanView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task)
 }
 
 /* ══════════ TIMELINE (gantt) ══════════ */
-export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void }) {
+export function TimelineView({ tasks, onOpen, sortKey = "name" }: { tasks: Task[]; onOpen: (t: Task) => void; sortKey?: string }) {
   const { projects } = useProjects();
 
   // Per-project collapse (persists across view switches).
@@ -294,9 +302,20 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
     const key = t.projectId || "inbox";
     (groupMap.get(key) ?? groupMap.set(key, []).get(key)!).push(t);
   }
+  const groupDue = (key: string) => {
+    const p = key !== "inbox" ? projects.find((pr) => pr.id === key) : null;
+    return p?.due ?? "9999-99";
+  };
   const groups = [...groupMap.entries()]
-    .map(([key, items]) => ({ key, items, meta: projectMeta(key === "inbox" ? null : key) }))
-    .sort((a, b) => a.meta.name.localeCompare(b.meta.name));
+    .map(([key, items]) => {
+      const done = items.filter((t) => t.completed).length;
+      return { key, items, meta: projectMeta(key === "inbox" ? null : key), pct: items.length ? done / items.length : 0, due: groupDue(key) };
+    })
+    .sort((a, b) => {
+      if (sortKey === "due") return a.due.localeCompare(b.due) || a.meta.name.localeCompare(b.meta.name);
+      if (sortKey === "progress") return b.pct - a.pct || a.meta.name.localeCompare(b.meta.name);
+      return a.meta.name.localeCompare(b.meta.name); // name / client
+    });
 
   // Frozen (sticky) so the task name stays visible while scrolling through days.
   // zIndex 3 keeps it above the day-grid's task bars (2) and the today marker (1).

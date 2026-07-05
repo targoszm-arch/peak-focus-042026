@@ -250,8 +250,8 @@ export default function Projects() {
         ))}
       </div>
 
-      {view === "board" && <KanbanView tasks={searchedProjectTasks} onOpen={setEditTask} />}
-      {view === "timeline" && <TimelineView tasks={searchedProjectTasks} onOpen={setEditTask} />}
+      {view === "board" && <KanbanView tasks={searchedProjectTasks} onOpen={setEditTask} sortKey={sortKey} />}
+      {view === "timeline" && <TimelineView tasks={searchedProjectTasks} onOpen={setEditTask} sortKey={sortKey} />}
       {view === "calendar" && <CalendarView tasks={searchedProjectTasks} onOpen={setEditTask} />}
 
       {view === "list" && (

@@ -8,7 +8,7 @@ const fieldLabel: React.CSSProperties = {
   textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-tertiary)", marginBottom: 7,
 };
 
-const MAX_COMPACT = 3;
+const MAX_COMPACT = 4;
 
 /**
  * Upload + list files attached to one task or one project.
@@ -17,7 +17,7 @@ const MAX_COMPACT = 3;
  * this same component full-size in a modal.
  */
 export default function Attachments({ taskId, projectId, compact = false }: { taskId?: string; projectId?: string; compact?: boolean }) {
-  const { attachments, loading, uploading, error, upload, download, remove } = useAttachments({ taskId, projectId });
+  const { attachments, loading, uploading, error, upload, download, remove, reload } = useAttachments({ taskId, projectId });
   const inputRef = useRef<HTMLInputElement>(null);
   const [viewAll, setViewAll] = useState(false);
 
@@ -36,7 +36,7 @@ export default function Attachments({ taskId, projectId, compact = false }: { ta
       </div>
 
       {visible.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 6, marginBottom: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginBottom: 8 }}>
           {visible.map((a) => (
             <div
               key={a.id}
@@ -138,7 +138,7 @@ export default function Attachments({ taskId, projectId, compact = false }: { ta
       </div>
 
       {viewAll && (
-        <ModalShell title="Files" icon="DocumentProperty1Linear" onClose={() => setViewAll(false)} footer={null}>
+        <ModalShell title="Files" icon="DocumentProperty1Linear" width={780} onClose={() => { setViewAll(false); void reload(); }} footer={null}>
           <Attachments taskId={taskId} projectId={projectId} />
         </ModalShell>
       )}
