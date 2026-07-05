@@ -315,6 +315,9 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
           )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {/* Capped + internally scrolled so adding steps doesn't push the
+              notes editor (below) around while you copy items across. */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto", overscrollBehavior: "contain", paddingRight: 2 }}>
           {checklist.map((c) => (
             <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 8px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)" }}>
               <button onClick={() => void toggleTask(c.id)} title={c.completed ? "Mark not done" : "Mark done"} style={{
@@ -355,6 +358,7 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
               No steps yet — break this task into an execution checklist below.
             </div>
           )}
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 2 }}>
             <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: "var(--radius-sm)", border: "1.5px dashed var(--border-strong)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)" }}>
               <Icon name="AddProperty1Bold" size={13} />
