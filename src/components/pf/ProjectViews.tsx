@@ -5,6 +5,7 @@ import { usePeople } from "@/hooks/use-people";
 import { useProjects } from "@/hooks/use-projects";
 import { bucket, label as dueLabel } from "@/lib/pfdate";
 import { PRIORITY_LABEL, PRIORITY_TOKEN } from "./pf-helpers";
+import { useFocusQueue } from "@/hooks/use-focus-queue";
 import TaskRow from "./TaskRow";
 
 /* Project task views — Board (kanban drag-drop), Timeline (gantt), Calendar.
@@ -41,6 +42,8 @@ export function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t:
   const { checklistStats, assigneesByTask, toggleTask } = useTasks();
   const { people } = usePeople();
   const { projects } = useProjects();
+  const focus = useFocusQueue();
+  const queued = focus.has(task.id);
   const overdue = bucket(task.endsAt) === "overdue" && !task.completed;
   const sub = checklistStats(task.id);
   const subPct = sub.total ? Math.round((sub.done / sub.total) * 100) : 0;
@@ -123,6 +126,14 @@ export function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t:
         </span>
         <span style={{ flex: 1 }} />
         {assignees.length > 0 && <AvatarGroup users={assignees.map((a) => ({ name: a.name }))} size={22} max={3} />}
+        <button
+          onClick={(e) => { e.stopPropagation(); queued ? focus.remove(task.id) : focus.add(task.id); }}
+          title={queued ? "Remove from focus" : "Add to focus"}
+          aria-pressed={queued}
+          style={{ flexShrink: 0, width: 27, height: 27, borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", background: queued ? "var(--primary-500)" : "var(--surface-sunken)", color: queued ? "#fff" : "var(--text-tertiary)" }}
+        >
+          <Icon name="TimerProperty1Bold" size={14} />
+        </button>
       </div>
     </div>
   );
