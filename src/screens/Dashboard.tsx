@@ -261,26 +261,6 @@ export default function Dashboard() {
 
   const dateStr = new Date().toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" });
 
-  // Which widget sits in the left (wide) vs right slot of the grid below —
-  // persisted locally so the dashboard stays customized. Reordering is via
-  // swap buttons rather than drag: native HTML5 drag-and-drop has no touch
-  // support on iOS Safari, so a drag handle would silently not work there.
-  const [widgetOrder, setWidgetOrder] = useState<["time" | "urgent", "time" | "urgent"]>(() => {
-    try {
-      const saved = localStorage.getItem(WIDGET_ORDER_KEY);
-      if (saved === "urgent,time") return ["urgent", "time"];
-    } catch { /* ignore */ }
-    return ["time", "urgent"];
-  });
-  const swapWidgets = () => {
-    setWidgetOrder(([a, b]) => {
-      const next: ["time" | "urgent", "time" | "urgent"] = [b, a];
-      try { localStorage.setItem(WIDGET_ORDER_KEY, next.join(",")); } catch { /* ignore */ }
-      return next;
-    });
-  };
-  const widgets = { time: <TimeTracker tasks={tasks} />, urgent: <UrgentTasks tasks={tasks} onToggle={toggleTask} /> };
-
   return (
     <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 56px" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
@@ -295,26 +275,8 @@ export default function Dashboard() {
         <StatCard icon={<Icon name="TaskSquareProperty1Bold" size={20} />} label="Open tasks" value={stats.remaining} iconTone="primary" />
       </div>
 
-      <button
-        onClick={swapWidgets}
-        title="Swap widget positions"
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 6, marginTop: 16,
-          height: 30, padding: "0 10px", borderRadius: "var(--radius-md)",
-          border: "1px solid var(--border-soft)", background: "var(--surface-card)",
-          color: "var(--text-secondary)", cursor: "pointer",
-          fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600,
-        }}
-      >
-        <Icon name="ArrowLeftProperty1Linear" size={13} /><Icon name="ArrowRightProperty1Linear" size={13} /> Swap widgets
-      </button>
-
-      <div
-        className="pf-2col"
-        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) minmax(0, 1fr)", gap: 16, marginTop: 10, alignItems: "start" }}
-      >
-        {widgets[widgetOrder[0]]}
-        {widgets[widgetOrder[1]]}
+      <div style={{ marginTop: 16 }}>
+        <UrgentTasks tasks={tasks} onToggle={toggleTask} />
       </div>
     </div>
   );
