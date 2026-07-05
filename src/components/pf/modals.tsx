@@ -7,6 +7,7 @@ import { useClients } from "@/hooks/use-clients";
 import { usePeople } from "@/hooks/use-people";
 import { PRIORITY_TOKEN, PRIORITY_LABEL } from "./pf-helpers";
 import Attachments from "./Attachments";
+import RichText from "./RichText";
 
 /* Shared modal chrome — ported from the design system's EditModals.jsx. */
 
@@ -381,13 +382,14 @@ export function ProjectEditModal({ project, onClose }: { project: ProjectFull | 
   const isNew = !project;
   const [name, setName] = useState(project?.name ?? "");
   const [clientId, setClientId] = useState(project?.clientId ?? "");
+  const [description, setDescription] = useState(project?.description ?? "");
   const [due, setDue] = useState(project?.due ?? "");
 
   const save = async () => {
     const n = name.trim();
     if (!n) return;
-    if (isNew) await addProject({ name: n, clientId: clientId || null, due: due || null });
-    else await updateProject(project.id, { name: n, clientId: clientId || null, due: due || null });
+    if (isNew) await addProject({ name: n, clientId: clientId || null, description, due: due || null });
+    else await updateProject(project.id, { name: n, clientId: clientId || null, description, due: due || null });
     onClose();
   };
 
@@ -428,6 +430,10 @@ export function ProjectEditModal({ project, onClose }: { project: ProjectFull | 
           <label style={fieldLabel}>Target date</label>
           <input type="date" value={due} onChange={(e) => setDue(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }} />
         </div>
+      </div>
+      <div>
+        <label style={fieldLabel}>Description</label>
+        <RichText value={description} onChange={setDescription} />
       </div>
       {!isNew && (
         <div style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--text-tertiary)" }}>
