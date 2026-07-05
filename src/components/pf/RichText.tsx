@@ -23,10 +23,16 @@ export default function RichText({
   value,
   onChange,
   placeholder = "Describe what this project is about…",
+  minHeight = 96,
+  maxHeight = 220,
+  fill = false,
 }: {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  minHeight?: number;
+  maxHeight?: number;
+  fill?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -45,7 +51,7 @@ export default function RichText({
   };
 
   return (
-    <div style={{ border: "1px solid var(--border-strong)", borderRadius: "var(--radius-md)", overflow: "hidden", background: "var(--surface-card)" }}>
+    <div style={{ border: "1px solid var(--border-strong)", borderRadius: "var(--radius-md)", overflow: "hidden", background: "var(--surface-card)", ...(fill ? { display: "flex", flexDirection: "column", height: "100%" } : {}) }}>
       <div style={{ display: "flex", gap: 6, padding: "7px 8px", borderBottom: "1px solid var(--border-soft)", background: "var(--surface-sunken)" }}>
         <button type="button" title="Bold" onMouseDown={(e) => { e.preventDefault(); exec("bold"); }} style={btn}>B</button>
         <button type="button" title="Italic" onMouseDown={(e) => { e.preventDefault(); exec("italic"); }} style={{ ...btn, fontStyle: "italic", fontWeight: 600 }}>i</button>
@@ -62,8 +68,7 @@ export default function RichText({
         onInput={(e) => onChange(e.currentTarget.innerHTML)}
         className="pf-richtext"
         style={{
-          minHeight: 96,
-          maxHeight: 220,
+          ...(fill ? { flex: 1, minHeight: 0 } : { minHeight, maxHeight }),
           overflowY: "auto",
           padding: "12px 14px",
           outline: "none",
