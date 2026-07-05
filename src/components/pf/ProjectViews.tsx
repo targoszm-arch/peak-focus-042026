@@ -195,6 +195,18 @@ export function KanbanView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task)
 export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void }) {
   const { projects } = useProjects();
 
+  // Per-project collapse (persists across view switches).
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("pf.timeline.collapsed") || "[]")); } catch { return new Set(); }
+  });
+  const toggleCollapse = (key: string) =>
+    setCollapsed((prev) => {
+      const n = new Set(prev);
+      if (n.has(key)) n.delete(key); else n.add(key);
+      try { localStorage.setItem("pf.timeline.collapsed", JSON.stringify([...n])); } catch { /* ignore */ }
+      return n;
+    });
+
   // Resizable label column.
   // Default narrower on small screens so the day grid is visible without
   // needing to drag-resize first — the resize handle is hard to hit precisely
@@ -343,13 +355,14 @@ export function TimelineView({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Tas
             {groups.map((g, gi) => (
               <Fragment key={g.key}>
                 <div style={{ display: "flex", alignItems: "center", height: 32, background: "var(--surface-sunken)", borderBottom: "1px solid var(--border-soft)", borderTop: gi > 0 ? "1px solid var(--border-soft)" : "none" }}>
-                  <div style={{ position: "sticky", left: 0, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 16px", zIndex: 3 }}>
+                  <button onClick={() => toggleCollapse(g.key)} aria-expanded={!collapsed.has(g.key)} title={collapsed.has(g.key) ? "Expand project" : "Collapse project"} style={{ position: "sticky", left: 0, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 16px", height: "100%", zIndex: 3, border: "none", background: "var(--surface-sunken)", cursor: "pointer" }}>
+                    <Icon name="ArrowDownProperty1Linear" size={14} style={{ color: "var(--text-tertiary)", transform: collapsed.has(g.key) ? "rotate(-90deg)" : "none", transition: "transform .18s", flexShrink: 0 }} />
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: g.meta.color, flexShrink: 0 }} />
                     <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 700, color: "var(--text-primary)", whiteSpace: "nowrap" }}>{g.meta.name}</span>
                     <span style={{ fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)" }}>{g.items.length}</span>
-                  </div>
+                  </button>
                 </div>
-                {g.items.map((t) => {
+                {!collapsed.has(g.key) && g.items.map((t) => {
                   const s = startOf(t), e = endOf(t);
                   const startIndex = Math.round((s.getTime() - min.getTime()) / dayMs);
                   const duration = Math.round((e.getTime() - s.getTime()) / dayMs) + 1;

@@ -10,6 +10,7 @@ export type ProjectFull = {
   name: string;
   color: string;
   clientId: string | null;
+  description: string;
   due: string | null;
   status: ProjectStatus;
   createdAt: number;
@@ -26,6 +27,7 @@ function rowToProject(r: any): ProjectFull {
     name: r.name,
     color: r.color ?? "#266DF0",
     clientId: r.client_id ?? null,
+    description: r.description ?? "",
     due: r.due ?? null,
     status: (r.status ?? "active") as ProjectStatus,
     createdAt: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
@@ -68,6 +70,9 @@ function useProjectsState() {
           name: p.name.trim(),
           color,
           client_id: p.clientId ?? null,
+          // Omitted when empty so create still works before the description
+          // column migration is applied (DB default '' fills it).
+          description: p.description || undefined,
           due: p.due ?? null,
           status: p.status ?? "active",
         })
@@ -84,6 +89,9 @@ function useProjectsState() {
     if (patch.name !== undefined) row.name = patch.name.trim();
     if (patch.color !== undefined) row.color = patch.color;
     if (patch.clientId !== undefined) row.client_id = patch.clientId;
+    // Only sent when non-empty, so edits succeed before the description
+    // column migration is applied.
+    if (patch.description) row.description = patch.description;
     if (patch.due !== undefined) row.due = patch.due;
     if (patch.status !== undefined) row.status = patch.status;
     await supabase.from("projects").update(row).eq("id", id);

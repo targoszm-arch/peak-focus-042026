@@ -59,6 +59,14 @@ export default function Projects() {
     });
 
   const [query, setQuery] = useState("");
+  const [clientFilter, setClientFilter] = useState<string>(() => {
+    try { return localStorage.getItem("pf.projects.client") || ""; } catch { return ""; }
+  });
+  const setCF = (v: string) => { setClientFilter(v); try { localStorage.setItem("pf.projects.client", v); } catch { /* ignore */ } };
+  const [sortKey, setSortKey] = useState<string>(() => {
+    try { return localStorage.getItem("pf.projects.sort") || "name"; } catch { return "name"; }
+  });
+  const setSort = (v: string) => { setSortKey(v); try { localStorage.setItem("pf.projects.sort", v); } catch { /* ignore */ } };
   const [projModal, setProjModal] = useState<{ project: ProjectFull | null } | null>(null);
   const [editTask, setEditTask] = useState<Task | null>(null);
 
@@ -77,12 +85,22 @@ export default function Projects() {
   };
 
   const q = query.trim().toLowerCase();
+  const matchClient = (p: ProjectFull) =>
+    !clientFilter ||
+    (clientFilter === "__none" ? !p.clientId : p.clientId === clientFilter);
   const match = (p: ProjectFull) =>
-    !q ||
-    p.name.toLowerCase().includes(q) ||
-    (clientById.get(p.clientId ?? "")?.name ?? "").toLowerCase().includes(q);
+    matchClient(p) &&
+    (!q ||
+      p.name.toLowerCase().includes(q) ||
+      (clientById.get(p.clientId ?? "")?.name ?? "").toLowerCase().includes(q));
 
-  const withStat = projects.map((p) => ({ ...p, s: stat(p.id) }));
+  const clientNameOf = (p: ProjectFull) => clientById.get(p.clientId ?? "")?.name ?? "￿";
+  const withStat = projects.map((p) => ({ ...p, s: stat(p.id) })).sort((a, b) => {
+    if (sortKey === "client") return clientNameOf(a).localeCompare(clientNameOf(b)) || a.name.localeCompare(b.name);
+    if (sortKey === "due") return (a.due ?? "9999-99").localeCompare(b.due ?? "9999-99") || a.name.localeCompare(b.name);
+    if (sortKey === "progress") return b.s.pct - a.s.pct || a.name.localeCompare(b.name);
+    return a.name.localeCompare(b.name);
+  });
   const finished = withStat.filter((p) => ((p.s.total > 0 && p.s.pct === 100) || p.status === "done") && match(p));
   const finishedIds = new Set(finished.map((p) => p.id));
   const visible = withStat.filter((p) => !finishedIds.has(p.id) && match(p));
@@ -91,7 +109,8 @@ export default function Projects() {
   // Board/Timeline/Calendar don't have their own project rows to filter — apply
   // the same search here so switching views doesn't make the search box go dead.
   const matchingProjectIds = new Set(projects.filter(match).map((p) => p.id));
-  const searchedProjectTasks = q ? projectTasks.filter((t) => matchingProjectIds.has(t.projectId)) : projectTasks;
+  const searchedProjectTasks =
+    q || clientFilter ? projectTasks.filter((t) => matchingProjectIds.has(t.projectId)) : projectTasks;
 
   const projectCard = (p: (typeof withStat)[number], sec: SectionKey) => {
     const c = clientById.get(p.clientId ?? "");
@@ -191,9 +210,28 @@ export default function Projects() {
         </button>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, height: 42, padding: "0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)" }}>
-        <Icon name="SearchNormalProperty1Linear" size={17} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search for a project or client" style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text-primary)" }} />
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, height: 42, padding: "0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)", flex: "1 1 240px", minWidth: 0 }}>
+          <Icon name="SearchNormalProperty1Linear" size={17} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search for a project or client" style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, color: "var(--text-primary)" }} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: clientFilter ? "color-mix(in srgb, var(--primary-500) 8%, white)" : "var(--surface-card)", flexShrink: 0 }}>
+          <Icon name="CategoryProperty1Linear" size={16} style={{ color: clientFilter ? "var(--primary-500)" : "var(--text-tertiary)", flexShrink: 0 }} />
+          <select value={clientFilter} onChange={(e) => setCF(e.target.value)} aria-label="Filter by client" style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}>
+            <option value="">All clients</option>
+            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <option value="__none">No client</option>
+          </select>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)", flexShrink: 0 }}>
+          <Icon name="ArrowDownProperty1Linear" size={16} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+          <select value={sortKey} onChange={(e) => setSort(e.target.value)} aria-label="Sort projects" style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}>
+            <option value="name">Sort: Name</option>
+            <option value="client">Sort: Client</option>
+            <option value="due">Sort: Due date</option>
+            <option value="progress">Sort: Progress</option>
+          </select>
+        </div>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: 4, background: "var(--surface-sunken, var(--surface-page))", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", alignSelf: "flex-start", flexWrap: "wrap" }}>

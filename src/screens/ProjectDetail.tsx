@@ -141,6 +141,13 @@ export default function ProjectDetail() {
             <Icon name="TaskSquareProperty1Bold" size={14} /> {open.length} open · {done.length} done
           </span>
         </div>
+        {project.description && (
+          <div
+            className="pf-richtext-view"
+            style={{ paddingTop: 14, borderTop: "1px solid var(--border-soft)", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: 1.55, color: "var(--text-secondary)" }}
+            dangerouslySetInnerHTML={{ __html: project.description }}
+          />
+        )}
       </div>
 
       <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, height: "100%", boxSizing: "border-box", overflow: "hidden" }}>

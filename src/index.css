@@ -145,3 +145,11 @@
   .pf-hide-narrow { display: none !important; }
   .pf-main, .pf-scroll { overflow-x: hidden; max-width: 100vw; }
 }
+
+/* Rich-text editor (project description) */
+.pf-richtext:empty:before { content: attr(data-placeholder); color: var(--text-tertiary); pointer-events: none; }
+.pf-richtext ul { margin: 4px 0; padding-left: 22px; list-style: disc; }
+.pf-richtext ol { margin: 4px 0; padding-left: 22px; list-style: decimal; }
+.pf-richtext-view ul { margin: 4px 0; padding-left: 22px; list-style: disc; }
+.pf-richtext-view ol { margin: 4px 0; padding-left: 22px; list-style: decimal; }
+.pf-richtext-view p { margin: 0 0 6px; }
