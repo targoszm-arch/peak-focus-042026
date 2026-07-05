@@ -1,15 +1,11 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/ds";
+import RichText from "./RichText";
 
 const fieldLabel: React.CSSProperties = {
   display: "block", fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 700,
   textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-tertiary)",
-};
-const areaBase: React.CSSProperties = {
-  width: "100%", borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)",
-  background: "var(--surface-card)", fontFamily: "var(--font-sans)", fontSize: 14,
-  lineHeight: 1.55, color: "var(--text-primary)", outline: "none", boxSizing: "border-box", padding: "10px 12px",
 };
 const ExpandIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -45,12 +41,7 @@ export default function NotesField({
         </button>
       </div>
 
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{ ...areaBase, minHeight: 140, resize: "vertical" }}
-      />
+      <RichText value={value} onChange={onChange} placeholder={placeholder} minHeight={160} maxHeight={340} />
 
       {full &&
         createPortal(
@@ -65,13 +56,9 @@ export default function NotesField({
                   <Icon name="CloseCircleProperty1Linear" size={24} />
                 </button>
               </div>
-              <textarea
-                autoFocus
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                style={{ ...areaBase, flex: 1, border: "none", borderRadius: 0, fontSize: 15, padding: "18px 20px", resize: "none" }}
-              />
+              <div style={{ flex: 1, minHeight: 0, display: "flex", padding: "14px 16px" }}>
+                <RichText value={value} onChange={onChange} placeholder={placeholder} fill />
+              </div>
               <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px 18px", borderTop: "1px solid var(--border-soft)", background: "var(--surface-sunken)", flexShrink: 0 }}>
                 <button onClick={() => setFull(false)} style={{ height: 40, padding: "0 20px", borderRadius: "var(--radius-md)", border: "none", background: "var(--primary-500)", color: "#fff", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 700 }}>Done</button>
               </div>
