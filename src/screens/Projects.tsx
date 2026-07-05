@@ -95,9 +95,20 @@ export default function Projects() {
       (clientById.get(p.clientId ?? "")?.name ?? "").toLowerCase().includes(q));
 
   const clientNameOf = (p: ProjectFull) => clientById.get(p.clientId ?? "")?.name ?? "￿";
+  // Each project's most urgent open task (high=0 … none=3) so the List can sort
+  // by priority even though projects have no priority field of their own.
+  const PRIO_RANK: Record<string, number> = { high: 0, medium: 1, low: 2, none: 3 };
+  const projPrio: Record<string, number> = {};
+  for (const t of projectTasks) {
+    if (t.completed) continue;
+    const r = PRIO_RANK[t.priority] ?? 3;
+    if (projPrio[t.projectId] === undefined || r < projPrio[t.projectId]) projPrio[t.projectId] = r;
+  }
   const withStat = projects.map((p) => ({ ...p, s: stat(p.id) })).sort((a, b) => {
     if (sortKey === "client") return clientNameOf(a).localeCompare(clientNameOf(b)) || a.name.localeCompare(b.name);
     if (sortKey === "due") return (a.due ?? "9999-99").localeCompare(b.due ?? "9999-99") || a.name.localeCompare(b.name);
+    if (sortKey === "priority") return (projPrio[a.id] ?? 3) - (projPrio[b.id] ?? 3) || a.name.localeCompare(b.name);
+    if (sortKey === "created") return b.createdAt - a.createdAt || a.name.localeCompare(b.name);
     if (sortKey === "progress") return b.s.pct - a.s.pct || a.name.localeCompare(b.name);
     return a.name.localeCompare(b.name);
   });
@@ -226,9 +237,11 @@ export default function Projects() {
         <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)", flexShrink: 0 }}>
           <Icon name="ArrowDownProperty1Linear" size={16} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
           <select value={sortKey} onChange={(e) => setSort(e.target.value)} aria-label="Sort projects" style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}>
+            <option value="due">Sort: Due date</option>
+            <option value="priority">Sort: Priority</option>
             <option value="name">Sort: Name</option>
             <option value="client">Sort: Client</option>
-            <option value="due">Sort: Due date</option>
+            <option value="created">Sort: Newest</option>
             <option value="progress">Sort: Progress</option>
           </select>
         </div>

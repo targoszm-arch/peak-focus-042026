@@ -36,7 +36,7 @@ export default function Attachments({ taskId, projectId, compact = false }: { ta
       </div>
 
       {visible.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginBottom: 8 }}>
+        <div className="pf-files-grid" style={{ marginBottom: 8 }}>
           {visible.map((a) => (
             <div
               key={a.id}
