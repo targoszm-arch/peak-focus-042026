@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { Mic, Square } from "lucide-react";
 import { Icon } from "@/ds";
 import { useTasks, type Priority } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
+import { useSpeechToText } from "@/hooks/use-speech-to-text";
 import { PRIORITY_LABEL, PRIORITY_TOKEN, DUE_PRESETS, dueFromPreset } from "./pf-helpers";
 
 type Menu = "priority" | "project" | "due" | null;
@@ -25,6 +27,12 @@ export default function QuickAdd({
   const [due, setDue] = useState<"today" | "tomorrow" | "week" | "none">("today");
   const [menu, setMenu] = useState<Menu>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { supported: voiceSupported, listening, transcript, error: voiceError, toggle: toggleVoice } = useSpeechToText({
+    onFinalize: (text) => {
+      if (!text) return;
+      setName((prev) => (prev ? `${prev} ${text}` : text));
+    },
+  });
 
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus();
@@ -121,11 +129,12 @@ export default function QuickAdd({
         </span>
         <input
           ref={inputRef}
-          value={name}
+          value={listening ? [name, transcript].filter(Boolean).join(" ") : name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
           }}
+          readOnly={listening}
           placeholder={placeholder}
           style={{
             flex: 1,
@@ -137,6 +146,30 @@ export default function QuickAdd({
             color: "var(--text-primary)",
           }}
         />
+        {voiceSupported && (
+          <button
+            type="button"
+            onClick={toggleVoice}
+            aria-label={listening ? "Stop voice input" : "Add task by voice"}
+            title={listening ? "Stop voice input" : "Add task by voice"}
+            style={{
+              width: 34,
+              height: 34,
+              flexShrink: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border-soft)",
+              background: listening ? "var(--status-danger-bg)" : "var(--surface-card)",
+              color: listening ? "var(--status-danger)" : "var(--text-secondary)",
+              cursor: "pointer",
+              animation: listening ? "pf-mic-pulse 1.4s ease-in-out infinite" : undefined,
+            }}
+          >
+            {listening ? <Square className="h-4 w-4" fill="currentColor" /> : <Mic className="h-4 w-4" />}
+          </button>
+        )}
         <button
           onClick={submit}
           disabled={!name.trim()}
@@ -210,6 +243,12 @@ export default function QuickAdd({
           )}
         </div>
       </div>
+
+      {voiceError && (
+        <p style={{ margin: "8px 0 0 44px", fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--status-danger)" }}>
+          {voiceError === "not-allowed" ? "Microphone access denied — allow it in your browser to use voice input." : "Voice input hit a snag, try again."}
+        </p>
+      )}
     </div>
   );
 }

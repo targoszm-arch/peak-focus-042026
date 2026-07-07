@@ -118,6 +118,7 @@
 
 @keyframes pf-pop { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes pf-spin { to { transform: rotate(360deg); } }
+@keyframes pf-mic-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--status-danger) 35%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--status-danger) 0%, transparent); } }
 
 @media (max-width: 860px) {
   .pf-mobile-topbar {
