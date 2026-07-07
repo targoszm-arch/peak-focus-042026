@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Mic, Square } from "lucide-react";
 import { Card, Button, Icon, Checkbox, Badge, IconButton } from "@/ds";
 import { useTasks, type Task } from "@/hooks/use-tasks";
 import { useTime } from "@/hooks/use-time";
 import { useFocusQueue } from "@/hooks/use-focus-queue";
+import { useSpeechToText } from "@/hooks/use-speech-to-text";
 import { bucket, label as dueLabel } from "@/lib/pfdate";
+
+const NEXT_COMMAND = /\b(next|done)\b/i;
 
 const FOCUS_SECS = 25 * 60;
 
@@ -70,6 +74,15 @@ export default function Focus() {
   };
   const removeFromQueue = (id: string) => setQueue((q) => q.filter((x) => x !== id));
 
+  const { supported: voiceSupported, listening: voiceListening, error: voiceError, toggle: toggleVoice, stop: stopVoice } = useSpeechToText({
+    onFinalize: (text) => {
+      if (NEXT_COMMAND.test(text)) {
+        completeCurrent();
+        stopVoice();
+      }
+    },
+  });
+
   return (
     <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 56px" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
@@ -131,8 +144,27 @@ export default function Focus() {
             <Button variant="ghost" size="lg" disabled={running} onClick={() => bump(-5)}>-5 min</Button>
           </div>
 
-          <div style={{ width: "100%", borderTop: "1px solid var(--border-soft)", paddingTop: 18, display: "flex", justifyContent: "center" }}>
-            <Button variant="accent" size="md" disabled={!current} onClick={completeCurrent} leadingIcon={<Icon name="TickCircleProperty1Bold" size={17} />}>Complete task</Button>
+          <div style={{ width: "100%", borderTop: "1px solid var(--border-soft)", paddingTop: 18, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Button variant="accent" size="md" disabled={!current} onClick={completeCurrent} leadingIcon={<Icon name="TickCircleProperty1Bold" size={17} />}>Complete task</Button>
+              {voiceSupported && (
+                <Button
+                  variant={voiceListening ? "danger" : "secondary"}
+                  size="md"
+                  disabled={!current}
+                  onClick={toggleVoice}
+                  aria-label={voiceListening ? "Stop listening" : "Say “next” to complete the task"}
+                  leadingIcon={voiceListening ? <Square className="h-4 w-4" fill="currentColor" /> : <Mic className="h-4 w-4" />}
+                >
+                  {voiceListening ? "Listening…" : "Say “next”"}
+                </Button>
+              )}
+            </div>
+            {voiceError && (
+              <p style={{ margin: 0, fontSize: 12, color: "var(--status-danger)", textAlign: "center" }}>
+                {voiceError === "not-allowed" ? "Microphone access denied — allow it in your browser to use voice commands." : "Voice input hit a snag, try again."}
+              </p>
+            )}
           </div>
         </Card>
 
