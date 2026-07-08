@@ -51,7 +51,7 @@ export default function Focus() {
   const running = !!time.running;
   const runningTask = time.running?.taskId ? byId.get(time.running.taskId) : null;
   const runningLabel = runningTask?.title ?? time.running?.description ?? "Untitled focus";
-  const secondsLeft = running ? Math.max(0, FOCUS_SECS - Math.floor(time.durationOf(time.running!) / 1000)) : manualSecs;
+  const secondsLeft = running ? Math.max(0, manualSecs - Math.floor(time.durationOf(time.running!) / 1000)) : manualSecs;
 
   const toggleRun = () => {
     if (running) void time.stop();
