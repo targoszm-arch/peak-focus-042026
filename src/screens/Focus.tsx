@@ -47,18 +47,34 @@ export default function Focus() {
   // Pomodoro timer — countdown is local; whether it's *running* comes from the
   // single shared time-tracking session (useTime), same source Dashboard reads.
   const [manualSecs, setManualSecs] = useState(FOCUS_SECS);
+  // Seconds already spent on the *current* block across prior run segments —
+  // pausing ends the underlying time entry, so without this the countdown
+  // would forget everything elapsed before the last pause.
+  const [elapsedBeforePause, setElapsedBeforePause] = useState(0);
   const [mode] = useState<"focus" | "break">("focus");
   const running = !!time.running;
   const runningTask = time.running?.taskId ? byId.get(time.running.taskId) : null;
   const runningLabel = runningTask?.title ?? time.running?.description ?? "Untitled focus";
-  const secondsLeft = running ? Math.max(0, manualSecs - Math.floor(time.durationOf(time.running!) / 1000)) : manualSecs;
+  const currentSegmentSecs = running ? Math.floor(time.durationOf(time.running!) / 1000) : 0;
+  const secondsLeft = Math.max(0, manualSecs - elapsedBeforePause - currentSegmentSecs);
+
+  // A different task becoming current (queue reorder, completion, removal)
+  // starts a fresh block — don't carry over the old task's progress.
+  useEffect(() => {
+    setElapsedBeforePause(0);
+  }, [current?.id]);
 
   const toggleRun = () => {
-    if (running) void time.stop();
-    else if (current) void time.start({ taskId: current.id, description: current.title });
+    if (running) {
+      setElapsedBeforePause((s) => s + currentSegmentSecs);
+      void time.stop();
+    } else if (current) {
+      void time.start({ taskId: current.id, description: current.title });
+    }
   };
   const reset = () => {
     if (running) void time.stop();
+    setElapsedBeforePause(0);
     setManualSecs(FOCUS_SECS);
   };
   const bump = (deltaMin: number) => {
@@ -70,6 +86,7 @@ export default function Focus() {
     void toggleTask(current.id);
     setQueue((q) => q.filter((id) => id !== current.id));
     if (running) void time.stop();
+    setElapsedBeforePause(0);
     setManualSecs(FOCUS_SECS);
   };
   const removeFromQueue = (id: string) => setQueue((q) => q.filter((x) => x !== id));
@@ -137,7 +154,7 @@ export default function Focus() {
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
             <Button variant={running ? "secondary" : "primary"} size="lg" disabled={!current && !running} onClick={toggleRun} leadingIcon={<Icon name={running ? "ClockProperty1Bold" : "TimerProperty1Bold"} size={18} />}>
-              {running ? "Pause" : secondsLeft === FOCUS_SECS ? "Start" : "Resume"}
+              {running ? "Pause" : elapsedBeforePause === 0 ? "Start" : "Resume"}
             </Button>
             <Button variant="secondary" size="lg" onClick={reset} leadingIcon={<Icon name="ArrowLeftProperty1Linear" size={17} />}>Reset</Button>
             <Button variant="ghost" size="lg" disabled={running} onClick={() => bump(5)}>+5 min</Button>
