@@ -14,7 +14,7 @@ export default function AppLayout() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement;
-      const typing = el && /input|textarea|select/i.test(el.tagName);
+      const typing = el && (/input|textarea|select/i.test(el.tagName) || (el as HTMLElement).isContentEditable);
       if (e.key === "Escape") {
         setQuickOpen(false);
         setOpen(false);

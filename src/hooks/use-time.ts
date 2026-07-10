@@ -65,9 +65,11 @@ function useTimeState() {
 
   const running = useMemo(() => entries.find((e) => e.endedAt === null) ?? null, [entries]);
 
-  // tick every second while a timer runs
+  // tick every second while a timer runs — seed immediately so a `now` that
+  // went stale while paused doesn't briefly overshoot the elapsed time on resume.
   useEffect(() => {
     if (!running) return;
+    setNow(Date.now());
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [running]);
