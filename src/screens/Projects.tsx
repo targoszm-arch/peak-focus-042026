@@ -269,8 +269,8 @@ export default function Projects() {
 
       {view === "list" && (
         <>
+          {favourites.length > 0 && section("favourites", favourites, "")}
           {section("visible", visible, q ? "No projects match this search." : "No active projects — create your first one above.")}
-          {section("favourites", favourites, "No starred projects yet — tap the star on any project.")}
           {section("finished", finished, "No finished projects yet.")}
         </>
       )}
