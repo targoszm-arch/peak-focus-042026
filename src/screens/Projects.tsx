@@ -9,7 +9,7 @@ import { label as dueLabel, bucket } from "@/lib/pfdate";
 import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
 import { KanbanView, TimelineView, CalendarView } from "@/components/pf/ProjectViews";
 
-/* Projects — grouped directory (My Projects · Favourites · Finished) with
+/* Projects — grouped directory (Favourites · My Projects · Finished) with
    search, star-to-favourite, and Board / Timeline / Calendar views across all
    project tasks. Ported from the design system's ProjectsScreen. */
 
@@ -269,6 +269,7 @@ export default function Projects() {
 
       {view === "list" && (
         <>
+          {section("favourites", favourites, "No starred projects yet — tap the star on any project.")}
           {favourites.length > 0 && section("favourites", favourites, "")}
           {section("visible", visible, q ? "No projects match this search." : "No active projects — create your first one above.")}
           {section("finished", finished, "No finished projects yet.")}
