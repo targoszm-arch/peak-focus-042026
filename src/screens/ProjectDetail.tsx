@@ -4,12 +4,14 @@ import { Icon, ProgressBar, AvatarGroup } from "@/ds";
 import QuickAdd from "@/components/pf/QuickAdd";
 import { TaskCardGrid } from "@/components/pf/ProjectViews";
 import Attachments from "@/components/pf/Attachments";
+import ProjectLinks from "@/components/pf/ProjectLinks";
 import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
 import { useTasks, type Task } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { usePeople } from "@/hooks/use-people";
 import { label as dueLabel } from "@/lib/pfdate";
+import { linkifyHtml } from "@/lib/linkify";
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -145,13 +147,16 @@ export default function ProjectDetail() {
           <div
             className="pf-richtext-view"
             style={{ paddingTop: 14, borderTop: "1px solid var(--border-soft)", fontFamily: "var(--font-sans)", fontSize: 14, lineHeight: 1.55, color: "var(--text-secondary)" }}
-            dangerouslySetInnerHTML={{ __html: project.description }}
+            dangerouslySetInnerHTML={{ __html: linkifyHtml(project.description) }}
           />
         )}
       </div>
 
-      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, height: "100%", boxSizing: "border-box", overflow: "hidden" }}>
-        <Attachments projectId={project.id} compact />
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+        <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, boxSizing: "border-box", overflow: "hidden" }}>
+          <Attachments projectId={project.id} compact />
+        </div>
+        <ProjectLinks projectId={project.id} />
       </div>
       </div>
 
