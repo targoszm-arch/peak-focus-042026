@@ -154,6 +154,8 @@
 .pf-richtext-view ul { margin: 4px 0; padding-left: 22px; list-style: disc; }
 .pf-richtext-view ol { margin: 4px 0; padding-left: 22px; list-style: decimal; }
 .pf-richtext-view p { margin: 0 0 6px; }
+.pf-richtext-view a, .pf-richtext a { color: var(--primary-600); text-decoration: underline; word-break: break-word; }
+.pf-richtext-view a:hover, .pf-richtext a:hover { color: var(--primary-700); }
 
 /* Attachments "Files" grid — 1 file per row under 1000px so names stay
    readable in the narrow side panel; 2 per row on wider screens. */
