@@ -6,12 +6,22 @@ import { TaskCardGrid } from "@/components/pf/ProjectViews";
 import Attachments from "@/components/pf/Attachments";
 import ProjectLinks from "@/components/pf/ProjectLinks";
 import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
-import { useTasks, type Task } from "@/hooks/use-tasks";
+import { useTasks, type Task, type TaskStatus, type Priority } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { usePeople } from "@/hooks/use-people";
 import { label as dueLabel } from "@/lib/pfdate";
 import { linkifyHtml } from "@/lib/linkify";
+
+const PRIORITY_RANK: Record<Priority, number> = { high: 0, medium: 1, low: 2, none: 3 };
+const selectWrap: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 10px 0 12px",
+  borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)", flexShrink: 0,
+};
+const selectStyle: React.CSSProperties = {
+  border: "none", outline: "none", background: "transparent",
+  fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer",
+};
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -22,14 +32,33 @@ export default function ProjectDetail() {
   const { people } = usePeople();
   const [editOpen, setEditOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
+  const [query, setQuery] = useState("");
+  const [statusF, setStatusF] = useState("");
+  const [priorityF, setPriorityF] = useState("");
+  const [sortKey, setSortKey] = useState("due");
 
   const project = projects.find((p) => p.id === id) ?? null;
   const client = project ? clients.find((c) => c.id === project.clientId) ?? null : null;
 
   const list = useMemo(() => rootTasks.filter((t) => t.projectId === id), [rootTasks, id]);
-  const open = list.filter((t) => !t.completed);
-  const done = list.filter((t) => t.completed);
-  const pct = list.length ? Math.round((done.length / list.length) * 100) : 0;
+  const q = query.trim().toLowerCase();
+  const filtered = useMemo(() => list.filter((t) => {
+    if (q && !t.title.toLowerCase().includes(q)) return false;
+    if (statusF && t.status !== statusF) return false;
+    if (priorityF && t.priority !== priorityF) return false;
+    return true;
+  }), [list, q, statusF, priorityF]);
+  const cmp = (a: Task, b: Task) => {
+    if (sortKey === "priority") return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.title.localeCompare(b.title);
+    if (sortKey === "name") return a.title.localeCompare(b.title);
+    if (sortKey === "created") return b.createdAt - a.createdAt;
+    return (a.endsAt ?? "9999-99").localeCompare(b.endsAt ?? "9999-99") || a.title.localeCompare(b.title); // due
+  };
+  const open = filtered.filter((t) => !t.completed).sort(cmp);
+  const done = filtered.filter((t) => t.completed).sort(cmp);
+  const anyFilter = !!(q || statusF || priorityF);
+  const totalDone = list.filter((t) => t.completed).length;
+  const pct = list.length ? Math.round((totalDone / list.length) * 100) : 0;
 
   // Unique people assigned across this project's tasks.
   const team = useMemo(() => {
@@ -121,7 +150,7 @@ export default function ProjectDetail() {
           </div>
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 800, color: "var(--text-primary)" }}>{pct}%</div>
-            <div style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--text-tertiary)" }}>{done.length}/{list.length} done</div>
+            <div style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--text-tertiary)" }}>{totalDone}/{list.length} done</div>
           </div>
         </div>
         <ProgressBar value={pct} height={8} tone={pct === 100 ? "success" : "primary"} />
@@ -140,7 +169,7 @@ export default function ProjectDetail() {
           )}
           <span style={{ flex: 1 }} />
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-tertiary)" }}>
-            <Icon name="TaskSquareProperty1Bold" size={14} /> {open.length} open · {done.length} done
+            <Icon name="TaskSquareProperty1Bold" size={14} /> {list.length - totalDone} open · {totalDone} done
           </span>
         </div>
         {project.description && (
@@ -162,26 +191,70 @@ export default function ProjectDetail() {
 
       <QuickAdd defaultProjectId={project.id} placeholder={`Add a task to ${project.name}…`} />
 
-      {/* open tasks */}
-      <div>
-        {groupHead("To do", open.length)}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {open.length === 0 ? (
-            <div style={{ padding: 22, textAlign: "center", color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", fontSize: 14, background: "var(--surface-card)", border: "1px dashed var(--border-strong)", borderRadius: "var(--radius-lg)" }}>
-              No open tasks — this project is all caught up.
-            </div>
-          ) : (
-            <TaskCardGrid tasks={open} onOpen={setEditTask} />
-          )}
+      {/* search + filters */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, height: 38, padding: "0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)", flex: "1 1 220px", minWidth: 0 }}>
+          <Icon name="SearchNormalProperty1Linear" size={16} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tasks in this project" style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 13.5, color: "var(--text-primary)" }} />
+        </div>
+        <div style={{ ...selectWrap, background: statusF ? "color-mix(in srgb, var(--primary-500) 8%, white)" : "var(--surface-card)" }}>
+          <Icon name="Element3Property1Linear" size={14} style={{ color: statusF ? "var(--primary-500)" : "var(--text-tertiary)" }} />
+          <select value={statusF} onChange={(e) => setStatusF(e.target.value)} aria-label="Filter by status" style={selectStyle}>
+            <option value="">All statuses</option>
+            {(["todo", "progress", "review", "done"] as TaskStatus[]).map((s) => (
+              <option key={s} value={s}>{s === "todo" ? "To do" : s === "progress" ? "In progress" : s === "review" ? "In review" : "Done"}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ ...selectWrap, background: priorityF ? "color-mix(in srgb, var(--primary-500) 8%, white)" : "var(--surface-card)" }}>
+          <Icon name="FlagProperty1Bold" size={14} style={{ color: priorityF ? "var(--primary-500)" : "var(--text-tertiary)" }} />
+          <select value={priorityF} onChange={(e) => setPriorityF(e.target.value)} aria-label="Filter by priority" style={selectStyle}>
+            <option value="">Any priority</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+            <option value="none">None</option>
+          </select>
+        </div>
+        <div style={selectWrap}>
+          <Icon name="ArrowDownProperty1Linear" size={14} style={{ color: "var(--text-tertiary)" }} />
+          <select value={sortKey} onChange={(e) => setSortKey(e.target.value)} aria-label="Sort tasks" style={selectStyle}>
+            <option value="due">Sort: Due date</option>
+            <option value="priority">Sort: Priority</option>
+            <option value="name">Sort: Name</option>
+            <option value="created">Sort: Newest</option>
+          </select>
         </div>
       </div>
 
-      {/* done */}
-      {done.length > 0 && (
-        <div>
-          {groupHead("Done", done.length)}
-          <TaskCardGrid tasks={done} onOpen={setEditTask} />
+      {anyFilter && open.length === 0 && done.length === 0 ? (
+        <div style={{ padding: 22, textAlign: "center", color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", fontSize: 14, background: "var(--surface-card)", border: "1px dashed var(--border-strong)", borderRadius: "var(--radius-lg)" }}>
+          No tasks match your search or filters.
         </div>
+      ) : (
+        <>
+          {/* open tasks */}
+          <div>
+            {groupHead("To do", open.length)}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {open.length === 0 ? (
+                <div style={{ padding: 22, textAlign: "center", color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", fontSize: 14, background: "var(--surface-card)", border: "1px dashed var(--border-strong)", borderRadius: "var(--radius-lg)" }}>
+                  No open tasks — this project is all caught up.
+                </div>
+              ) : (
+                <TaskCardGrid tasks={open} onOpen={setEditTask} />
+              )}
+            </div>
+          </div>
+
+          {/* done */}
+          {done.length > 0 && (
+            <div>
+              {groupHead("Done", done.length)}
+              <TaskCardGrid tasks={done} onOpen={setEditTask} />
+            </div>
+          )}
+        </>
       )}
 
       {editOpen && <ProjectEditModal project={project} onClose={() => setEditOpen(false)} />}
