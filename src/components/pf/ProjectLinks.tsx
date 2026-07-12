@@ -119,18 +119,18 @@ export default function ProjectLinks({ projectId }: { projectId: string }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void submit(); } }}
-          placeholder="Paste a URL…"
+          placeholder="Label (optional)"
           style={{ height: 34, borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", padding: "0 11px", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-primary)", outline: "none" }}
         />
         <div style={{ display: "flex", gap: 7 }}>
           <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void submit(); } }}
-            placeholder="Label (optional)"
+            placeholder="Paste a URL…"
             style={{ flex: 1, minWidth: 0, height: 34, borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", padding: "0 11px", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-primary)", outline: "none" }}
           />
           <button
