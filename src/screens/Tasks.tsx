@@ -41,6 +41,12 @@ export default function Tasks() {
   const [statusF, setStatusF] = useState(() => load("pf.tasks.status"));
   const [priorityF, setPriorityF] = useState(() => load("pf.tasks.priority"));
   const [sortKey, setSortKey] = useState(() => load("pf.tasks.sort", "due"));
+  const [completedCollapsed, setCompletedCollapsed] = useState(() => load("pf.tasks.completedCollapsed") === "1");
+  const toggleCompletedCollapsed = () => {
+    const next = !completedCollapsed;
+    setCompletedCollapsed(next);
+    save("pf.tasks.completedCollapsed", next ? "1" : "");
+  };
 
   const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const q = query.trim().toLowerCase();
@@ -163,6 +169,23 @@ export default function Tasks() {
         {GROUPS.map((g) => {
           const items = grouped[g.key];
           if (!items.length) return null;
+          if (g.key === "done") {
+            return (
+              <Card key={g.key} padding={18}>
+                <button
+                  onClick={toggleCompletedCollapsed}
+                  aria-expanded={!completedCollapsed}
+                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: completedCollapsed ? 0 : 12, background: "transparent", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}
+                >
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{g.title}</h3>
+                  <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontWeight: 600 }}>{items.length}</span>
+                  <span style={{ flex: 1 }} />
+                  <Icon name="ArrowDownProperty1Linear" size={15} style={{ color: "var(--text-tertiary)", transform: completedCollapsed ? "rotate(-90deg)" : "none", transition: "transform .2s" }} />
+                </button>
+                {!completedCollapsed && <TaskCardGrid tasks={items} onOpen={setEditTask} />}
+              </Card>
+            );
+          }
           return (
             <Card key={g.key} padding={18}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
