@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Icon, ProgressBar, AvatarGroup } from "@/ds";
 import { useProjects, type ProjectFull } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
-import { useTasks, INBOX_ID, type Task } from "@/hooks/use-tasks";
+import { useTasks, INBOX_ID, type Task, type Priority, type TaskStatus } from "@/hooks/use-tasks";
 import { usePeople } from "@/hooks/use-people";
 import { label as dueLabel, bucket } from "@/lib/pfdate";
 import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
@@ -63,6 +63,18 @@ export default function Projects() {
     try { return localStorage.getItem("pf.projects.client") || ""; } catch { return ""; }
   });
   const setCF = (v: string) => { setClientFilter(v); try { localStorage.setItem("pf.projects.client", v); } catch { /* ignore */ } };
+  const [projectFilter, setProjectFilter] = useState<string>(() => {
+    try { return localStorage.getItem("pf.projects.project") || ""; } catch { return ""; }
+  });
+  const setPF = (v: string) => { setProjectFilter(v); try { localStorage.setItem("pf.projects.project", v); } catch { /* ignore */ } };
+  const [statusFilter, setStatusFilter] = useState<string>(() => {
+    try { return localStorage.getItem("pf.projects.status") || ""; } catch { return ""; }
+  });
+  const setSF = (v: string) => { setStatusFilter(v); try { localStorage.setItem("pf.projects.status", v); } catch { /* ignore */ } };
+  const [priorityFilter, setPriorityFilter] = useState<string>(() => {
+    try { return localStorage.getItem("pf.projects.priority") || ""; } catch { return ""; }
+  });
+  const setPrF = (v: string) => { setPriorityFilter(v); try { localStorage.setItem("pf.projects.priority", v); } catch { /* ignore */ } };
   const [sortKey, setSortKey] = useState<string>(() => {
     try { return localStorage.getItem("pf.projects.sort") || "name"; } catch { return "name"; }
   });
@@ -90,6 +102,7 @@ export default function Projects() {
     (clientFilter === "__none" ? !p.clientId : p.clientId === clientFilter);
   const match = (p: ProjectFull) =>
     matchClient(p) &&
+    (!projectFilter || p.id === projectFilter) &&
     (!q ||
       p.name.toLowerCase().includes(q) ||
       (clientById.get(p.clientId ?? "")?.name ?? "").toLowerCase().includes(q));
@@ -118,10 +131,17 @@ export default function Projects() {
   const favourites = visible.filter((p) => starred.has(p.id));
 
   // Board/Timeline/Calendar don't have their own project rows to filter — apply
-  // the same search here so switching views doesn't make the search box go dead.
+  // the same search/client/project filters here so switching views doesn't make
+  // them go dead, plus task-level status/priority filters.
   const matchingProjectIds = new Set(projects.filter(match).map((p) => p.id));
-  const searchedProjectTasks =
-    q || clientFilter ? projectTasks.filter((t) => matchingProjectIds.has(t.projectId)) : projectTasks;
+  const anyProjectFilter = !!(q || clientFilter || projectFilter);
+  const searchedProjectTasks = projectTasks.filter((t) => {
+    if (anyProjectFilter && !matchingProjectIds.has(t.projectId)) return false;
+    if (statusFilter && t.status !== statusFilter) return false;
+    if (priorityFilter && t.priority !== priorityFilter) return false;
+    return true;
+  });
+  const anyTaskViewFilter = anyProjectFilter || !!statusFilter || !!priorityFilter;
 
   const projectCard = (p: (typeof withStat)[number], sec: SectionKey) => {
     const c = clientById.get(p.clientId ?? "");
@@ -234,6 +254,35 @@ export default function Projects() {
             <option value="__none">No client</option>
           </select>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: projectFilter ? "color-mix(in srgb, var(--primary-500) 8%, white)" : "var(--surface-card)", flexShrink: 0 }}>
+          <Icon name="FolderProperty1Linear" size={16} style={{ color: projectFilter ? "var(--primary-500)" : "var(--text-tertiary)", flexShrink: 0 }} />
+          <select value={projectFilter} onChange={(e) => setPF(e.target.value)} aria-label="Filter by project" style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}>
+            <option value="">All projects</option>
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        {view !== "list" && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: statusFilter ? "color-mix(in srgb, var(--primary-500) 8%, white)" : "var(--surface-card)", flexShrink: 0 }}>
+              <Icon name="Element3Property1Linear" size={16} style={{ color: statusFilter ? "var(--primary-500)" : "var(--text-tertiary)", flexShrink: 0 }} />
+              <select value={statusFilter} onChange={(e) => setSF(e.target.value)} aria-label="Filter by status" style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}>
+                <option value="">All statuses</option>
+                {(["todo", "progress", "review", "done"] as TaskStatus[]).map((s) => (
+                  <option key={s} value={s}>{s === "todo" ? "To do" : s === "progress" ? "In progress" : s === "review" ? "In review" : "Done"}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: priorityFilter ? "color-mix(in srgb, var(--primary-500) 8%, white)" : "var(--surface-card)", flexShrink: 0 }}>
+              <Icon name="FlagProperty1Bold" size={16} style={{ color: priorityFilter ? "var(--primary-500)" : "var(--text-tertiary)", flexShrink: 0 }} />
+              <select value={priorityFilter} onChange={(e) => setPrF(e.target.value)} aria-label="Filter by priority" style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}>
+                <option value="">Any priority</option>
+                {(["high", "medium", "low", "none"] as Priority[]).map((p) => (
+                  <option key={p} value={p}>{p === "none" ? "None" : p[0].toUpperCase() + p.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+          </>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)", flexShrink: 0 }}>
           <Icon name="ArrowDownProperty1Linear" size={16} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
           <select value={sortKey} onChange={(e) => setSort(e.target.value)} aria-label="Sort projects" style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}>
@@ -245,6 +294,14 @@ export default function Projects() {
             <option value="progress">Sort: Progress</option>
           </select>
         </div>
+        {(clientFilter || projectFilter || statusFilter || priorityFilter) && (
+          <button
+            onClick={() => { setCF(""); setPF(""); setSF(""); setPrF(""); }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 42, padding: "0 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)", cursor: "pointer", color: "var(--text-secondary)", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700 }}
+          >
+            <Icon name="CloseCircleProperty1Linear" size={15} /> Clear
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: 4, background: "var(--surface-sunken, var(--surface-page))", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", alignSelf: "flex-start", flexWrap: "wrap" }}>
@@ -263,6 +320,11 @@ export default function Projects() {
         ))}
       </div>
 
+      {view !== "list" && anyTaskViewFilter && searchedProjectTasks.length === 0 && (
+        <div style={{ padding: "18px 4px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
+          No tasks match these filters.
+        </div>
+      )}
       {view === "board" && <KanbanView tasks={searchedProjectTasks} onOpen={setEditTask} sortKey={sortKey} />}
       {view === "timeline" && <TimelineView tasks={searchedProjectTasks} onOpen={setEditTask} sortKey={sortKey} />}
       {view === "calendar" && <CalendarView tasks={searchedProjectTasks} onOpen={setEditTask} />}
