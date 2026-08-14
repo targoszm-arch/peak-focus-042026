@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Icon } from "@/ds";
 import { supabase } from "@/lib/supabase";
 
@@ -23,7 +23,93 @@ function actionLabel(a: { tool: string; args: Record<string, unknown>; result: u
   }
 }
 
-const READ_ONLY_TOOLS = new Set(["list_projects", "get_project", "list_tasks", "list_clients"]);
+const READ_ONLY_TOOLS = new Set(["list_projects", "get_project", "list_tasks", "list_clients", "list_recent_meetings"]);
+
+/* ── tiny, dependency-free markdown renderer for assistant replies —
+   handles the headers/bold/bullets/numbered-lists Claude reliably produces,
+   without pulling in a markdown library or risking raw HTML injection
+   (everything below builds React elements, never dangerouslySetInnerHTML). ── */
+function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const re = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+  let last = 0;
+  let match: RegExpExecArray | null;
+  let i = 0;
+  while ((match = re.exec(text))) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    const chunk = match[0];
+    if (chunk.startsWith("**")) parts.push(<strong key={`${keyPrefix}-${i++}`}>{chunk.slice(2, -2)}</strong>);
+    else if (chunk.startsWith("`")) {
+      parts.push(
+        <code key={`${keyPrefix}-${i++}`} style={{ background: "var(--surface-sunken)", borderRadius: 4, padding: "1px 5px", fontSize: "0.92em" }}>
+          {chunk.slice(1, -1)}
+        </code>
+      );
+    } else parts.push(<em key={`${keyPrefix}-${i++}`}>{chunk.slice(1, -1)}</em>);
+    last = re.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+function renderMarkdown(text: string): React.ReactNode {
+  const lines = text.split("\n");
+  const blocks: React.ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^#{1,3}\s+/.test(line)) {
+      blocks.push(
+        <div key={key} style={{ fontWeight: 800, fontSize: 13.5, marginTop: blocks.length ? 6 : 0 }}>
+          {renderInline(line.replace(/^#{1,3}\s+/, ""), `h${key++}`)}
+        </div>
+      );
+      i++;
+      continue;
+    }
+    if (/^[-*]\s+/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*]\s+/.test(lines[i])) { items.push(lines[i].replace(/^[-*]\s+/, "")); i++; }
+      blocks.push(
+        <ul key={key} style={{ margin: "2px 0", paddingLeft: 18 }}>
+          {items.map((it, j) => <li key={j} style={{ marginBottom: 2 }}>{renderInline(it, `li${key}-${j}`)}</li>)}
+        </ul>
+      );
+      key++;
+      continue;
+    }
+    if (/^\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i])) { items.push(lines[i].replace(/^\d+\.\s+/, "")); i++; }
+      blocks.push(
+        <ol key={key} style={{ margin: "2px 0", paddingLeft: 18 }}>
+          {items.map((it, j) => <li key={j} style={{ marginBottom: 2 }}>{renderInline(it, `oli${key}-${j}`)}</li>)}
+        </ol>
+      );
+      key++;
+      continue;
+    }
+    if (line.trim() === "") { i++; continue; }
+    const paraLines: string[] = [];
+    while (i < lines.length && lines[i].trim() !== "" && !/^[-*]\s+/.test(lines[i]) && !/^\d+\.\s+/.test(lines[i]) && !/^#{1,3}\s+/.test(lines[i])) {
+      paraLines.push(lines[i]);
+      i++;
+    }
+    blocks.push(
+      <div key={key}>
+        {paraLines.map((pl, j) => (
+          <Fragment key={j}>
+            {j > 0 && <br />}
+            {renderInline(pl, `p${key}-${j}`)}
+          </Fragment>
+        ))}
+      </div>
+    );
+    key++;
+  }
+  return <>{blocks}</>;
+}
 
 export default function AssistantPanel({ open, onClose, projectId }: { open: boolean; onClose: () => void; projectId?: string }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -112,12 +198,13 @@ export default function AssistantPanel({ open, onClose, projectId }: { open: boo
               <div
                 style={{
                   maxWidth: "88%", padding: "9px 13px", borderRadius: "var(--radius-lg)",
-                  fontFamily: "var(--font-sans)", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap",
+                  fontFamily: "var(--font-sans)", fontSize: 13.5, lineHeight: 1.5,
+                  whiteSpace: m.role === "user" ? "pre-wrap" : "normal",
                   background: m.role === "user" ? "var(--primary-500)" : m.role === "error" ? "color-mix(in srgb, var(--red-500) 10%, white)" : "var(--surface-page)",
                   color: m.role === "user" ? "#fff" : m.role === "error" ? "var(--red-500)" : "var(--text-primary)",
                 }}
               >
-                {m.text}
+                {m.role === "assistant" ? renderMarkdown(m.text) : m.text}
               </div>
               {!!m.actions?.length && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>

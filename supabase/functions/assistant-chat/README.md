@@ -23,6 +23,16 @@ supabase secrets set ANTHROPIC_API_KEY=sk-ant-... --project-ref filtmcykamccfiku
 
 (or Supabase Dashboard → Edge Functions → Secrets)
 
+**2b. Optional — let the assistant read meetings.** Get a personal API key from
+Fireflies (Settings → Developer Settings → API Keys), then set it the same way:
+
+```bash
+supabase secrets set FIREFLIES_API_KEY=... --project-ref filtmcykamccfikuxehy
+```
+
+Without this secret, everything else still works — the assistant just can't
+call `list_recent_meetings`, and will say so if asked about meetings.
+
 **3. Deploy the function:**
 
 ```bash
@@ -36,7 +46,8 @@ ever called from the logged-in web app, never externally.
 
 - Read: projects (description, status, due date, client, bookmarked links,
   attachment filenames), tasks (notes, checklist, priority, status,
-  assignees), clients.
+  assignees), clients, and — if `FIREFLIES_API_KEY` is set — recent Fireflies
+  meeting transcripts (title, attendees, AI summary, action items).
 - Write: create/update/complete/delete tasks and checklist steps,
   create/update projects.
 - **Not yet:** reading the actual contents of uploaded file attachments —

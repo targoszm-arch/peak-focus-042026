@@ -167,6 +167,18 @@ const TOOLS = [
     description: "List clients with stage, health, ARR and renewal date.",
     input_schema: { type: "object", properties: {} },
   },
+  {
+    name: "list_recent_meetings",
+    description: "List recent Fireflies meeting transcripts (title, date, attendees, AI-generated summary and action items). Use this to check what was actually discussed, decided, or promised in meetings, and weigh that alongside task data before judging progress or urgency — a due date alone doesn't tell you whether something is stalled, already handled in a call, or blocked on someone else. Only works if the FIREFLIES_API_KEY secret is configured; if it errors, tell the user that.",
+    input_schema: {
+      type: "object",
+      properties: {
+        from_date: { type: "string", description: "YYYY-MM-DD — only meetings on/after this date" },
+        to_date: { type: "string", description: "YYYY-MM-DD — only meetings on/before this date" },
+        limit: { type: "number", default: 10, description: "max meetings to return (max 25)" },
+      },
+    },
+  },
 ] as const;
 
 /* ── tool implementations — `db` is a service-role client, `uid` is the caller ── */
@@ -359,6 +371,48 @@ function makeHandlers(db: SupabaseClient, uid: string): Record<string, (args: Re
       if (error) throw new Error(error.message);
       return data ?? [];
     },
+
+    async list_recent_meetings({ from_date, to_date, limit = 10 }) {
+      const key = Deno.env.get("FIREFLIES_API_KEY");
+      if (!key) throw new Error("FIREFLIES_API_KEY secret is not configured for this function.");
+      const query = `
+        query Transcripts($limit: Int, $fromDate: DateTime, $toDate: DateTime) {
+          transcripts(limit: $limit, fromDate: $fromDate, toDate: $toDate) {
+            id
+            title
+            date
+            duration
+            organizer_email
+            participants
+            summary { short_summary action_items }
+          }
+        }`;
+      const res = await fetch("https://api.fireflies.ai/graphql", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          query,
+          variables: {
+            limit: Math.min(Number(limit) || 10, 25),
+            fromDate: from_date || undefined,
+            toDate: to_date || undefined,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (json.errors?.length) throw new Error(`Fireflies API: ${json.errors.map((e: { message: string }) => e.message).join("; ")}`);
+      return ((json.data?.transcripts ?? []) as Record<string, unknown>[]).map((t) => ({
+        id: t.id,
+        title: t.title,
+        date: t.date ? new Date(t.date as number).toISOString().slice(0, 10) : null,
+        duration_minutes: t.duration,
+        organizer: t.organizer_email,
+        participants: t.participants,
+        summary: (t.summary as { short_summary?: string } | null)?.short_summary,
+        action_items: (t.summary as { action_items?: string } | null)?.action_items,
+        link: `https://app.fireflies.ai/view/${t.id}`,
+      }));
+    },
   };
 }
 
@@ -397,6 +451,8 @@ function systemPrompt(projectId?: string) {
     `You can directly create, update, complete, and delete tasks/projects using the provided tools — you do not need to ask for confirmation before acting, but always summarize in plain language what you did (or would do) at the end of your reply.`,
     `Use list_projects/get_project/list_tasks to look up ids before mutating anything; never guess an id.`,
     projectId ? `The user is currently viewing project id ${projectId} — assume that's the subject unless they say otherwise.` : "",
+    `When judging urgency, priority, or what's "actually important" — never rank purely by due date. A close due date is one signal among several, and an untouched due date can just mean nobody's updated it. Before calling something urgent or stalled, weigh: the task's notes and checklist content (what does the work actually involve, and how far along does it look — not just the done/total count but whether the steps that exist are substantive), the priority field the user set, how long a task has sat with no status change, and the parent project's description and client context (e.g. an at-risk or high-ARR client's work matters more than its due date alone suggests). Say what evidence you're using, not just "X is due soon." (Meeting context via list_recent_meetings is a separate, narrower tool — see its own instructions below for when that's actually warranted.)`,
+    `list_recent_meetings reads Fireflies meeting transcripts. It's a targeted lookup, not a default step — do NOT call it on routine planning/triage questions where task data alone answers the question. Only call it when: the user explicitly mentions a meeting/call/conversation ("what did we say on the call", "check the standup"), or you're assessing one specific task/project whose task data is genuinely ambiguous (no useful notes, stale status, but plausibly already resolved verbally) and confirming against a recent meeting would change your answer. When you do call it, scope from_date narrowly (e.g. the last 1-2 weeks unless the user implies otherwise) rather than pulling full history. It needs the FIREFLIES_API_KEY secret configured; if it errors, say so plainly instead of guessing at meeting content.`,
     `File attachments only expose filenames/metadata right now, not their contents — say so if asked to read inside a file.`,
     `Be concise. Prefer short plans and bullet lists over long prose.`,
   ]
