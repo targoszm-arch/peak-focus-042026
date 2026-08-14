@@ -5,11 +5,15 @@ import QuickAdd from "@/components/pf/QuickAdd";
 import { TaskCardGrid } from "@/components/pf/ProjectViews";
 import Attachments from "@/components/pf/Attachments";
 import ProjectLinks from "@/components/pf/ProjectLinks";
+import Comments from "@/components/pf/Comments";
 import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
+import ShareProjectModal from "@/components/pf/ShareProjectModal";
+import TaskViewModal from "@/components/pf/TaskViewModal";
 import { useTasks, type Task, type TaskStatus, type Priority } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { usePeople } from "@/hooks/use-people";
+import { useAccess } from "@/hooks/use-access";
 import { label as dueLabel } from "@/lib/pfdate";
 import { linkifyHtml } from "@/lib/linkify";
 
@@ -26,16 +30,24 @@ const selectStyle: React.CSSProperties = {
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isOwner } = useAccess();
   const { rootTasks, assigneesByTask } = useTasks();
   const { projects, updateProject } = useProjects();
   const { clients } = useClients();
   const { people } = usePeople();
   const [editOpen, setEditOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [query, setQuery] = useState("");
   const [statusF, setStatusF] = useState("");
   const [priorityF, setPriorityF] = useState("");
   const [sortKey, setSortKey] = useState("due");
+
+  // The project owner sees the full workspace shell; anyone viewing here
+  // without owning the project is an invited collaborator (view + comment).
+  // Access resolves before this screen ever mounts (see the app-level gate),
+  // so isOwner is never null by the time we get here.
+  const canEdit = isOwner === true;
 
   const project = projects.find((p) => p.id === id) ?? null;
   const client = project ? clients.find((c) => c.id === project.clientId) ?? null : null;
@@ -97,9 +109,16 @@ export default function ProjectDetail() {
           <Icon name="ArrowLeftProperty1Linear" size={16} /> Projects
         </button>
         <span style={{ flex: 1 }} />
-        <button onClick={() => setEditOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", cursor: "pointer", color: "var(--text-secondary)", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700 }}>
-          <Icon name="EditProperty1Linear" size={15} /> Edit project
-        </button>
+        {canEdit && (
+          <>
+            <button onClick={() => setShareOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", cursor: "pointer", color: "var(--text-secondary)", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700 }}>
+              <Icon name="Profile2userProperty1Linear" size={15} /> Share
+            </button>
+            <button onClick={() => setEditOpen(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", cursor: "pointer", color: "var(--text-secondary)", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700 }}>
+              <Icon name="EditProperty1Linear" size={15} /> Edit project
+            </button>
+          </>
+        )}
       </div>
 
       <style>{`.pf-proj-head-grid{display:grid;grid-template-columns:1fr;gap:16px;} @media (min-width:760px){ .pf-proj-head-grid{grid-template-columns:1.5fr 1fr;} }`}</style>
@@ -112,28 +131,29 @@ export default function ProjectDetail() {
           </span>
           <div style={{ flex: 1, minWidth: 200 }}>
             <h1
-              contentEditable
+              contentEditable={canEdit}
               suppressContentEditableWarning
               spellCheck={false}
-              title="Click to edit"
+              title={canEdit ? "Click to edit" : undefined}
               onKeyDown={(e) => {
                 if (e.key === "Enter") { e.preventDefault(); (e.currentTarget as HTMLElement).blur(); }
                 else if (e.key === "Escape") { e.currentTarget.textContent = project.name; (e.currentTarget as HTMLElement).blur(); }
               }}
-              onFocus={(e) => { e.currentTarget.style.background = "var(--surface-sunken)"; }}
+              onFocus={(e) => { if (canEdit) e.currentTarget.style.background = "var(--surface-sunken)"; }}
               onBlur={(e) => {
                 e.currentTarget.style.background = "transparent";
+                if (!canEdit) return;
                 const v = e.currentTarget.textContent?.trim() ?? "";
                 if (v && v !== project.name) void updateProject(project.id, { name: v });
                 else e.currentTarget.textContent = project.name;
               }}
-              style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-primary)", outline: "none", borderRadius: "var(--radius-sm)", padding: "2px 5px", marginLeft: -5, cursor: "text", display: "inline-block" }}
+              style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em", color: "var(--text-primary)", outline: "none", borderRadius: "var(--radius-sm)", padding: "2px 5px", marginLeft: -5, cursor: canEdit ? "text" : "default", display: "inline-block" }}
             >
               {project.name}
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-secondary)", flexWrap: "wrap" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-              {client ? (
+              {client && canEdit ? (
                 <button
                   onClick={() => navigate(`/clients?client=${client.id}`)}
                   title={`Open ${client.name} in Clients`}
@@ -143,7 +163,7 @@ export default function ProjectDetail() {
                 >
                   {client.name}
                 </button>
-              ) : "No client"}
+              ) : client ? client.name : "No client"}
               <span style={{ color: "var(--text-tertiary)" }}>·</span>
               <Icon name="CalendarProperty1Linear" size={13} style={{ color: "var(--text-tertiary)" }} /> Due {dueLabel(project.due)}
             </div>
@@ -183,13 +203,16 @@ export default function ProjectDetail() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
         <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, boxSizing: "border-box", overflow: "hidden" }}>
-          <Attachments projectId={project.id} compact />
+          <Attachments projectId={project.id} compact readOnly={!canEdit} />
         </div>
-        <ProjectLinks projectId={project.id} />
+        <ProjectLinks projectId={project.id} readOnly={!canEdit} />
+        <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, boxSizing: "border-box" }}>
+          <Comments projectId={project.id} ownerId={project.ownerId} />
+        </div>
       </div>
       </div>
 
-      <QuickAdd defaultProjectId={project.id} placeholder={`Add a task to ${project.name}…`} />
+      {canEdit && <QuickAdd defaultProjectId={project.id} placeholder={`Add a task to ${project.name}…`} />}
 
       {/* search + filters */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -258,7 +281,11 @@ export default function ProjectDetail() {
       )}
 
       {editOpen && <ProjectEditModal project={project} onClose={() => setEditOpen(false)} />}
-      {editTask && <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />}
+      {shareOpen && <ShareProjectModal project={project} onClose={() => setShareOpen(false)} />}
+      {editTask && (canEdit
+        ? <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />
+        : <TaskViewModal task={editTask} project={project} onClose={() => setEditTask(null)} />
+      )}
     </div>
   );
 }

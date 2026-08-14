@@ -43,10 +43,11 @@ function usePeopleState() {
       setLoading(false);
       return;
     }
+    // No .eq("user_id", ...) filter — the owner sees their full roster via
+    // RLS; a collaborator sees only people assigned to tasks they can see.
     const { data, error } = await supabase
       .from("people")
       .select("*")
-      .eq("user_id", user.id)
       .order("created_at", { ascending: true });
     if (error) console.warn("[people]", error.message);
     setPeople((data ?? []).map(rowToPerson));

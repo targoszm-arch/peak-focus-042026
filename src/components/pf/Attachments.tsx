@@ -16,7 +16,7 @@ const MAX_COMPACT = 4;
  * first few files show; the rest are behind a "+N more" button that opens
  * this same component full-size in a modal.
  */
-export default function Attachments({ taskId, projectId, compact = false }: { taskId?: string; projectId?: string; compact?: boolean }) {
+export default function Attachments({ taskId, projectId, compact = false, readOnly = false }: { taskId?: string; projectId?: string; compact?: boolean; readOnly?: boolean }) {
   const { attachments, loading, uploading, error, upload, download, remove, reload } = useAttachments({ taskId, projectId });
   const inputRef = useRef<HTMLInputElement>(null);
   const [viewAll, setViewAll] = useState(false);
@@ -56,17 +56,19 @@ export default function Attachments({ taskId, projectId, compact = false }: { ta
               >
                 <Icon name="ArrowDownProperty1Linear" size={13} />
               </button>
-              <button
-                onClick={() => {
-                  if (window.confirm(`Delete "${a.fileName}"?`)) void remove(a);
-                }}
-                title="Delete"
-                style={{ flexShrink: 0, width: 22, height: 22, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-sm)" }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red-500)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
-              >
-                <Icon name="TrashProperty1Linear" size={13} />
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Delete "${a.fileName}"?`)) void remove(a);
+                  }}
+                  title="Delete"
+                  style={{ flexShrink: 0, width: 22, height: 22, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-sm)" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red-500)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+                >
+                  <Icon name="TrashProperty1Linear" size={13} />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -92,7 +94,7 @@ export default function Attachments({ taskId, projectId, compact = false }: { ta
           </div>
         )}
 
-        {compact ? (
+        {readOnly ? null : compact ? (
           <button
             onClick={() => setViewAll(true)}
             style={{
@@ -139,7 +141,7 @@ export default function Attachments({ taskId, projectId, compact = false }: { ta
 
       {viewAll && (
         <ModalShell title="Files" icon="DocumentProperty1Linear" width={780} onClose={() => { setViewAll(false); void reload(); }} footer={null}>
-          <Attachments taskId={taskId} projectId={projectId} />
+          <Attachments taskId={taskId} projectId={projectId} readOnly={readOnly} />
         </ModalShell>
       )}
     </div>

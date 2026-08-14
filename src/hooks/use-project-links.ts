@@ -35,10 +35,11 @@ export function useProjectLinks(projectId?: string) {
       return;
     }
     setLoading(true);
+    // No .eq("user_id", ...) filter — RLS returns links the caller owns or
+    // has collaborator access to.
     const { data, error: err } = await supabase
       .from("project_links")
       .select("*")
-      .eq("user_id", user.id)
       .eq("project_id", projectId)
       .order("created_at", { ascending: false });
     if (err) setError(err.message);

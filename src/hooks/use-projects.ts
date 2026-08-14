@@ -7,6 +7,7 @@ export type ProjectStatus = "active" | "on_hold" | "done" | "archived";
 
 export type ProjectFull = {
   id: string;
+  ownerId: string;
   name: string;
   color: string;
   clientId: string | null;
@@ -16,7 +17,7 @@ export type ProjectFull = {
   createdAt: number;
 };
 
-export type NewProject = Partial<Omit<ProjectFull, "id" | "createdAt">> & { name: string };
+export type NewProject = Partial<Omit<ProjectFull, "id" | "ownerId" | "createdAt">> & { name: string };
 
 const COLORS = ["#266DF0", "#F1613C", "#2A9E75", "#E6A609", "#8b5cf6", "#ec4899", "#14b8a6"];
 
@@ -24,6 +25,7 @@ const COLORS = ["#266DF0", "#F1613C", "#2A9E75", "#E6A609", "#8b5cf6", "#ec4899"
 function rowToProject(r: any): ProjectFull {
   return {
     id: r.id,
+    ownerId: r.user_id,
     name: r.name,
     color: r.color ?? "#266DF0",
     clientId: r.client_id ?? null,
@@ -45,10 +47,11 @@ function useProjectsState() {
       setLoading(false);
       return;
     }
+    // No .eq("user_id", ...) filter — RLS returns the caller's own projects
+    // plus any project they've been granted collaborator access to.
     const { data, error } = await supabase
       .from("projects")
       .select("*")
-      .eq("user_id", user.id)
       .order("created_at", { ascending: true });
     if (error) console.warn("[projects]", error.message);
     setProjects((data ?? []).map(rowToProject));

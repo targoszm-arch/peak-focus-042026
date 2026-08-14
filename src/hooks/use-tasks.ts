@@ -177,21 +177,20 @@ function useTasksState() {
       setAssigneesByTask({});
       return;
     }
+    // No .eq("user_id", ...) filters — RLS returns the caller's own rows
+    // plus anything they've been granted collaborator access to.
     const [{ data: t }, { data: p }, { data: a }] = await Promise.all([
       supabase
         .from("tasks")
         .select("*")
-        .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
       supabase
         .from("projects")
         .select("*")
-        .eq("user_id", user.id)
         .order("created_at", { ascending: true }),
       supabase
         .from("task_assignees")
-        .select("task_id, person_id")
-        .eq("user_id", user.id),
+        .select("task_id, person_id"),
     ]);
     setTasks((t ?? []).map(dbToTask));
     setProjects((p ?? []).map(dbToProject));

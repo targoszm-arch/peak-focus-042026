@@ -2,9 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AccessProvider, useAccess } from "@/hooks/use-access";
 import { TasksProvider } from "@/hooks/use-tasks";
 import { HabitsProvider } from "@/hooks/use-habits";
 import { ProjectsProvider } from "@/hooks/use-projects";
@@ -69,6 +70,31 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Holds route rendering until we know whether this account is the workspace
+// owner or an invited collaborator — avoids flashing the full nav/shell at
+// a collaborator before their restricted view kicks in.
+function AccessGate({ children }: { children: React.ReactNode }) {
+  const { loading } = useAccess();
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        Loading…
+      </main>
+    );
+  }
+  return <>{children}</>;
+}
+
+// Collaborators only ever get Projects (scoped by RLS to what they're
+// invited to) + Settings (their own profile/sign-out). Everything else —
+// Dashboard, Today, Tasks, Clients, People, Habits, Focus, Health,
+// Integrations — is the owner's workspace.
+function RequireOwner({ children }: { children: React.ReactNode }) {
+  const { isOwner } = useAccess();
+  if (isOwner === false) return <Navigate to="/projects" replace />;
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -77,25 +103,29 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthGate>
-            <DataProviders>
-            <Routes>
-              <Route element={<AppLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="today" element={<Today />} />
-                <Route path="tasks" element={<Tasks />} />
-                <Route path="projects" element={<Projects />} />
-                <Route path="projects/:id" element={<ProjectDetail />} />
-                <Route path="clients" element={<Clients />} />
-                <Route path="people" element={<People />} />
-                <Route path="habits" element={<Habits />} />
-                <Route path="focus" element={<Focus />} />
-                <Route path="health" element={<Health />} />
-                <Route path="integrations" element={<Integrations />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="*" element={<Placeholder title="Not found" />} />
-              </Route>
-            </Routes>
-            </DataProviders>
+            <AccessProvider>
+              <AccessGate>
+                <DataProviders>
+                <Routes>
+                  <Route element={<AppLayout />}>
+                    <Route index element={<RequireOwner><Dashboard /></RequireOwner>} />
+                    <Route path="today" element={<RequireOwner><Today /></RequireOwner>} />
+                    <Route path="tasks" element={<RequireOwner><Tasks /></RequireOwner>} />
+                    <Route path="projects" element={<Projects />} />
+                    <Route path="projects/:id" element={<ProjectDetail />} />
+                    <Route path="clients" element={<RequireOwner><Clients /></RequireOwner>} />
+                    <Route path="people" element={<RequireOwner><People /></RequireOwner>} />
+                    <Route path="habits" element={<RequireOwner><Habits /></RequireOwner>} />
+                    <Route path="focus" element={<RequireOwner><Focus /></RequireOwner>} />
+                    <Route path="health" element={<RequireOwner><Health /></RequireOwner>} />
+                    <Route path="integrations" element={<RequireOwner><Integrations /></RequireOwner>} />
+                    <Route path="settings" element={<Settings />} />
+                    <Route path="*" element={<Placeholder title="Not found" />} />
+                  </Route>
+                </Routes>
+                </DataProviders>
+              </AccessGate>
+            </AccessProvider>
           </AuthGate>
         </BrowserRouter>
       </TooltipProvider>

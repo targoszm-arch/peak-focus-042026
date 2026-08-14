@@ -24,7 +24,7 @@ function faviconOf(url: string): string {
   }
 }
 
-function LinkCard({ link, onRemove }: { link: ProjectLink; onRemove: (l: ProjectLink) => void }) {
+function LinkCard({ link, onRemove, readOnly }: { link: ProjectLink; onRemove: (l: ProjectLink) => void; readOnly?: boolean }) {
   const [broken, setBroken] = useState(false);
   const host = hostOf(link.url);
   const title = link.title || host;
@@ -62,21 +62,23 @@ function LinkCard({ link, onRemove }: { link: ProjectLink; onRemove: (l: Project
           </span>
         </span>
       </a>
-      <button
-        onClick={() => { if (window.confirm(`Remove this link?`)) onRemove(link); }}
-        title="Remove"
-        style={{ flexShrink: 0, width: 24, height: 24, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-sm)" }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red-500)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
-      >
-        <Icon name="TrashProperty1Linear" size={14} />
-      </button>
+      {!readOnly && (
+        <button
+          onClick={() => { if (window.confirm(`Remove this link?`)) onRemove(link); }}
+          title="Remove"
+          style={{ flexShrink: 0, width: 24, height: 24, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-sm)" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red-500)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+        >
+          <Icon name="TrashProperty1Linear" size={14} />
+        </button>
+      )}
     </div>
   );
 }
 
 /** Bookmarked URLs on a project, shown as thumbnail cards under the Files box. */
-export default function ProjectLinks({ projectId }: { projectId: string }) {
+export default function ProjectLinks({ projectId, readOnly = false }: { projectId: string; readOnly?: boolean }) {
   const { links, loading, error, add, remove } = useProjectLinks(projectId);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -106,45 +108,47 @@ export default function ProjectLinks({ projectId }: { projectId: string }) {
       {links.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 10 }}>
           {links.map((l) => (
-            <LinkCard key={l.id} link={l} onRemove={remove} />
+            <LinkCard key={l.id} link={l} onRemove={remove} readOnly={readOnly} />
           ))}
         </div>
       )}
 
       {!loading && links.length === 0 && (
         <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-tertiary)", padding: "2px 2px 8px" }}>
-          No links yet — paste a URL below.
+          {readOnly ? "No links yet." : "No links yet — paste a URL below."}
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void submit(); } }}
-          placeholder="Label (optional)"
-          style={{ height: 34, borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", padding: "0 11px", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-primary)", outline: "none" }}
-        />
-        <div style={{ display: "flex", gap: 7 }}>
+      {!readOnly && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void submit(); } }}
-            placeholder="Paste a URL…"
-            style={{ flex: 1, minWidth: 0, height: 34, borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", padding: "0 11px", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-primary)", outline: "none" }}
+            placeholder="Label (optional)"
+            style={{ height: 34, borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", padding: "0 11px", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-primary)", outline: "none" }}
           />
-          <button
-            onClick={() => void submit()}
-            disabled={adding || !url.trim()}
-            style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", borderRadius: "var(--radius-md)", border: "none", background: url.trim() ? "var(--primary-500)" : "var(--border-strong)", color: "#fff", cursor: url.trim() ? "pointer" : "default", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700 }}
-          >
-            <Icon name="AddProperty1Linear" size={14} /> Add
-          </button>
+          <div style={{ display: "flex", gap: 7 }}>
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void submit(); } }}
+              placeholder="Paste a URL…"
+              style={{ flex: 1, minWidth: 0, height: 34, borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", padding: "0 11px", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-primary)", outline: "none" }}
+            />
+            <button
+              onClick={() => void submit()}
+              disabled={adding || !url.trim()}
+              style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", borderRadius: "var(--radius-md)", border: "none", background: url.trim() ? "var(--primary-500)" : "var(--border-strong)", color: "#fff", cursor: url.trim() ? "pointer" : "default", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700 }}
+            >
+              <Icon name="AddProperty1Linear" size={14} /> Add
+            </button>
+          </div>
+          {error && (
+            <div style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--red-500)" }}>{error}</div>
+          )}
         </div>
-        {error && (
-          <div style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--red-500)" }}>{error}</div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

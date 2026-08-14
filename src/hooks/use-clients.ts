@@ -69,10 +69,11 @@ function useClientsState() {
       setLoading(false);
       return;
     }
+    // No .eq("user_id", ...) filter — the owner sees their full roster via
+    // RLS; a collaborator sees only the client linked to a project they're on.
     const { data, error } = await supabase
       .from("clients")
       .select("*")
-      .eq("user_id", user.id)
       .order("created_at", { ascending: true });
     if (error) console.warn("[clients]", error.message);
     setClients((data ?? []).map(rowToClient));
