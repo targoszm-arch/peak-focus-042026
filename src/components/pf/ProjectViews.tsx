@@ -39,14 +39,16 @@ let timelineScrollLeft: number | null = null;
 
 /* ── shared card used by the board (and any other card-grid view) ── */
 export function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t: Task) => void; dragging: boolean }) {
-  const { checklistStats, assigneesByTask, toggleTask } = useTasks();
+  const { checklistStats, childrenByParent, assigneesByTask, toggleTask } = useTasks();
   const { people } = usePeople();
   const { projects } = useProjects();
   const focus = useFocusQueue();
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const queued = focus.has(task.id);
   const overdue = bucket(task.endsAt) === "overdue" && !task.completed;
   const sub = checklistStats(task.id);
   const subPct = sub.total ? Math.round((sub.done / sub.total) * 100) : 0;
+  const steps = childrenByParent[task.id] ?? [];
   const assignees = (assigneesByTask[task.id] ?? [])
     .map((id) => people.find((p) => p.id === id))
     .filter(Boolean) as { name: string }[];
@@ -104,15 +106,39 @@ export function PFTaskCard({ task, onOpen, dragging }: { task: Task; onOpen: (t:
 
       {sub.total > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)" }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setChecklistOpen((v) => !v); }}
+            aria-expanded={checklistOpen}
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", border: "none", background: "transparent", padding: 0, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)" }}
+          >
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <Icon name="ArrowDownProperty1Linear" size={11} style={{ transform: checklistOpen ? "none" : "rotate(-90deg)", transition: "transform .15s" }} />
               <Icon name="TaskSquareProperty1Linear" size={12} /> {sub.done}/{sub.total} steps
             </span>
             <span>{subPct}%</span>
-          </div>
+          </button>
           <div style={{ height: 5, borderRadius: "var(--radius-full)", background: "var(--surface-sunken)", overflow: "hidden" }}>
             <div style={{ height: "100%", width: `${subPct}%`, borderRadius: "var(--radius-full)", background: task.completed || subPct === 100 ? "var(--green-600, #2A9E75)" : "var(--primary-500)", transition: "width .2s" }} />
           </div>
+          {checklistOpen && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 2 }}>
+              {steps.map((s) => (
+                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <span onClick={(e) => e.stopPropagation()} className="inline-flex shrink-0">
+                    <Checkbox checked={s.completed} onChange={() => toggleTask(s.id)} />
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-sans)", fontSize: 12.5, color: s.completed ? "var(--text-tertiary)" : "var(--text-secondary)",
+                      textDecoration: s.completed ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
+                    }}
+                  >
+                    {s.title}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
