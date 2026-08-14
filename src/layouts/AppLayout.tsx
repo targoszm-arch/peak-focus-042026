@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useParams } from "react-router-dom";
 import Sidebar from "@/components/shell/Sidebar";
 import PeakProgress from "@/components/shell/PeakProgress";
 import QuickAddModal from "@/components/shell/QuickAddModal";
+import AssistantPanel from "@/components/shell/AssistantPanel";
 
 const logo = "/brand/peak-focus-logo-transparent.png";
 
 export default function AppLayout() {
   const [open, setOpen] = useState(false); // mobile drawer
   const [quickOpen, setQuickOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const { id: routeProjectId } = useParams<{ id?: string }>();
 
   // Keyboard: N opens quick add, Esc closes overlays.
   useEffect(() => {
@@ -17,19 +20,25 @@ export default function AppLayout() {
       const typing = el && (/input|textarea|select/i.test(el.tagName) || (el as HTMLElement).isContentEditable);
       if (e.key === "Escape") {
         setQuickOpen(false);
+        setAssistantOpen(false);
         setOpen(false);
-      } else if ((e.key === "n" || e.key === "N") && !typing && !quickOpen) {
+      } else if ((e.key === "n" || e.key === "N") && !typing && !quickOpen && !assistantOpen) {
         e.preventDefault();
         setQuickOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [quickOpen]);
+  }, [quickOpen, assistantOpen]);
 
   return (
     <div className="pf-shell">
-      <Sidebar open={open} onClose={() => setOpen(false)} onQuickAdd={() => setQuickOpen(true)} />
+      <Sidebar
+        open={open}
+        onClose={() => setOpen(false)}
+        onQuickAdd={() => setQuickOpen(true)}
+        onAssistant={() => setAssistantOpen(true)}
+      />
 
       {/* mobile drawer scrim */}
       <div
@@ -110,6 +119,7 @@ export default function AppLayout() {
       </div>
 
       <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} />
+      <AssistantPanel open={assistantOpen} onClose={() => setAssistantOpen(false)} projectId={routeProjectId} />
     </div>
   );
 }

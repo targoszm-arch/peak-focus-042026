@@ -25,10 +25,12 @@ export default function Sidebar({
   open,
   onClose,
   onQuickAdd,
+  onAssistant,
 }: {
   open: boolean;
   onClose: () => void;
   onQuickAdd: () => void;
+  onAssistant: () => void;
 }) {
   const nav = useNavigate();
   const { pathname } = useLocation();
@@ -103,6 +105,32 @@ export default function Sidebar({
         <Icon name="AddProperty1Bold" size={19} />
         <span style={{ flex: 1, textAlign: "left", whiteSpace: "nowrap" }}>Quick add</span>
         <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.8 }}>N</span>
+      </button>
+
+      <button
+        onClick={() => {
+          onAssistant();
+          onClose();
+        }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          marginTop: 8,
+          padding: "11px 12px",
+          borderRadius: "var(--radius-md)",
+          border: "1px solid var(--border-soft)",
+          background: "var(--surface-card)",
+          color: "var(--text-primary)",
+          cursor: "pointer",
+          width: "100%",
+          fontFamily: "var(--font-sans)",
+          fontSize: 14,
+          fontWeight: 700,
+        }}
+      >
+        <Icon name="MessageProperty1Linear" size={19} style={{ color: "var(--primary-500)" }} />
+        <span style={{ flex: 1, textAlign: "left", whiteSpace: "nowrap" }}>Assistant</span>
       </button>
 
       <div
