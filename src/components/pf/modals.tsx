@@ -9,6 +9,7 @@ import { PRIORITY_TOKEN, PRIORITY_LABEL } from "./pf-helpers";
 import Attachments from "./Attachments";
 import RichText from "./RichText";
 import NotesField from "./NotesField";
+import Comments from "./Comments";
 
 /* Shared modal chrome — ported from the design system's EditModals.jsx. */
 
@@ -372,6 +373,10 @@ export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => vo
       <NotesField value={notes} onChange={setNotes} />
 
       <Attachments taskId={task.id} />
+
+      {task.projectId !== INBOX_ID && (
+        <Comments projectId={task.projectId} ownerId={projects.find((p) => p.id === task.projectId)?.ownerId ?? ""} taskId={task.id} />
+      )}
     </ModalShell>
   );
 }

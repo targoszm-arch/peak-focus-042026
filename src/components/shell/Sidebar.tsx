@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { Icon, NavItem, Avatar } from "@/ds";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAccess } from "@/hooks/use-access";
 import { useTasks } from "@/hooks/use-tasks";
 import { bucket } from "@/lib/pfdate";
 
@@ -21,6 +22,10 @@ const NAV: NavDef[] = [
   { key: "integrations", label: "Integrations", icon: "Element3Property1Linear", path: "/integrations" },
 ];
 
+// An invited collaborator only ever gets their granted project(s) — every
+// other section of the workspace is owner-only.
+const COLLABORATOR_NAV: NavDef[] = [{ key: "projects", label: "Projects", icon: "FolderProperty1Linear", path: "/projects" }];
+
 export default function Sidebar({
   open,
   onClose,
@@ -35,8 +40,10 @@ export default function Sidebar({
   const nav = useNavigate();
   const { pathname } = useLocation();
   const { user, signOut } = useAuth();
+  const { isOwner } = useAccess();
   const { tasks } = useTasks();
 
+  const navItems = isOwner === false ? COLLABORATOR_NAV : NAV;
   const openCount = tasks.filter(
     (t) => !t.completed && (bucket(t.endsAt) === "today" || bucket(t.endsAt) === "overdue")
   ).length;
@@ -79,33 +86,35 @@ export default function Sidebar({
         </span>
       </div>
 
-      <button
-        onClick={() => {
-          onQuickAdd();
-          onClose();
-        }}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          marginTop: 20,
-          padding: "11px 12px",
-          borderRadius: "var(--radius-md)",
-          border: "none",
-          background: "var(--primary-500)",
-          color: "#fff",
-          cursor: "pointer",
-          width: "100%",
-          fontFamily: "var(--font-sans)",
-          fontSize: 14,
-          fontWeight: 700,
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        <Icon name="AddProperty1Bold" size={19} />
-        <span style={{ flex: 1, textAlign: "left", whiteSpace: "nowrap" }}>Quick add</span>
-        <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.8 }}>N</span>
-      </button>
+      {isOwner !== false && (
+        <button
+          onClick={() => {
+            onQuickAdd();
+            onClose();
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginTop: 20,
+            padding: "11px 12px",
+            borderRadius: "var(--radius-md)",
+            border: "none",
+            background: "var(--primary-500)",
+            color: "#fff",
+            cursor: "pointer",
+            width: "100%",
+            fontFamily: "var(--font-sans)",
+            fontSize: 14,
+            fontWeight: 700,
+            boxShadow: "var(--shadow-sm)",
+          }}
+        >
+          <Icon name="AddProperty1Bold" size={19} />
+          <span style={{ flex: 1, textAlign: "left", whiteSpace: "nowrap" }}>Quick add</span>
+          <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.8 }}>N</span>
+        </button>
+      )}
 
       <button
         onClick={() => {
@@ -143,7 +152,7 @@ export default function Sidebar({
           gap: 2,
         }}
       >
-        {NAV.map((n) => (
+        {navItems.map((n) => (
           <NavItem
             key={n.key}
             icon={<Icon name={n.icon} size={20} />}

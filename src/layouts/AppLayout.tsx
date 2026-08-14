@@ -4,6 +4,7 @@ import Sidebar from "@/components/shell/Sidebar";
 import PeakProgress from "@/components/shell/PeakProgress";
 import QuickAddModal from "@/components/shell/QuickAddModal";
 import AssistantPanel from "@/components/shell/AssistantPanel";
+import { useAccess } from "@/hooks/use-access";
 
 const logo = "/brand/peak-focus-logo-transparent.png";
 
@@ -12,6 +13,8 @@ export default function AppLayout() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const { id: routeProjectId } = useParams<{ id?: string }>();
+  const { isOwner } = useAccess();
+  const canCreate = isOwner !== false;
 
   // Keyboard: N opens quick add, Esc closes overlays.
   useEffect(() => {
@@ -22,14 +25,14 @@ export default function AppLayout() {
         setQuickOpen(false);
         setAssistantOpen(false);
         setOpen(false);
-      } else if ((e.key === "n" || e.key === "N") && !typing && !quickOpen && !assistantOpen) {
+      } else if (canCreate && (e.key === "n" || e.key === "N") && !typing && !quickOpen && !assistantOpen) {
         e.preventDefault();
         setQuickOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [quickOpen, assistantOpen]);
+  }, [quickOpen, assistantOpen, canCreate]);
 
   return (
     <div className="pf-shell">
@@ -87,31 +90,33 @@ export default function AppLayout() {
             </span>
           </div>
 
-          <button
-            aria-label="Quick add"
-            onClick={() => setQuickOpen(true)}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: "var(--radius-md)",
-              border: "none",
-              background: "var(--primary-500)",
-              color: "#fff",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </button>
+          {canCreate && (
+            <button
+              aria-label="Quick add"
+              onClick={() => setQuickOpen(true)}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "var(--radius-md)",
+                border: "none",
+                background: "var(--primary-500)",
+                color: "#fff",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+          )}
         </div>
 
-        <PeakProgress />
+        {canCreate && <PeakProgress />}
 
         <div className="pf-scroll">
           <Outlet />

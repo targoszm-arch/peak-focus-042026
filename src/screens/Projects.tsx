@@ -5,8 +5,10 @@ import { useProjects, type ProjectFull } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { useTasks, INBOX_ID, type Task, type Priority, type TaskStatus } from "@/hooks/use-tasks";
 import { usePeople } from "@/hooks/use-people";
+import { useAccess } from "@/hooks/use-access";
 import { label as dueLabel, bucket } from "@/lib/pfdate";
 import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
+import TaskViewModal from "@/components/pf/TaskViewModal";
 import { KanbanView, TimelineView, CalendarView } from "@/components/pf/ProjectViews";
 
 /* Projects — grouped directory (Favourites · My Projects · Finished) with
@@ -27,6 +29,8 @@ type SectionKey = keyof typeof SECTIONS;
 
 export default function Projects() {
   const navigate = useNavigate();
+  const { isOwner } = useAccess();
+  const canEdit = isOwner === true;
   const { projects } = useProjects();
   const { clients } = useClients();
   const { rootTasks, projectStats, assigneesByTask } = useTasks();
@@ -35,6 +39,7 @@ export default function Projects() {
   const [view, setView] = useState<ViewKey>(() => {
     try { return (localStorage.getItem(VIEW_KEY) as ViewKey) || "list"; } catch { return "list"; }
   });
+  const effectiveView: ViewKey = canEdit ? view : "list";
   const setV = (v: ViewKey) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } };
 
   const [starred, setStarred] = useState<Set<string>>(() => {
@@ -236,9 +241,11 @@ export default function Projects() {
             {projects.length} project{projects.length === 1 ? "" : "s"} across {clients.length} client{clients.length === 1 ? "" : "s"}
           </p>
         </div>
-        <button onClick={() => setProjModal({ project: null })} style={{ display: "inline-flex", alignItems: "center", gap: 7, height: 40, padding: "0 16px", borderRadius: "var(--radius-md)", border: "none", background: "var(--primary-500)", color: "#fff", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 700, boxShadow: "var(--shadow-sm)", flexShrink: 0 }}>
-          <Icon name="AddProperty1Bold" size={17} /> New project
-        </button>
+        {canEdit && (
+          <button onClick={() => setProjModal({ project: null })} style={{ display: "inline-flex", alignItems: "center", gap: 7, height: 40, padding: "0 16px", borderRadius: "var(--radius-md)", border: "none", background: "var(--primary-500)", color: "#fff", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13.5, fontWeight: 700, boxShadow: "var(--shadow-sm)", flexShrink: 0 }}>
+            <Icon name="AddProperty1Bold" size={17} /> New project
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -261,7 +268,7 @@ export default function Projects() {
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
-        {view !== "list" && (
+        {effectiveView !== "list" && (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: statusFilter ? "color-mix(in srgb, var(--primary-500) 8%, white)" : "var(--surface-card)", flexShrink: 0 }}>
               <Icon name="Element3Property1Linear" size={16} style={{ color: statusFilter ? "var(--primary-500)" : "var(--text-tertiary)", flexShrink: 0 }} />
@@ -304,32 +311,34 @@ export default function Projects() {
         )}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: 4, background: "var(--surface-sunken, var(--surface-page))", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", alignSelf: "flex-start", flexWrap: "wrap" }}>
-        {([["list", "List", "FolderProperty1Linear"], ["board", "Board", "Element3Property1Linear"], ["timeline", "Timeline", "ChartProperty1Linear"], ["calendar", "Calendar", "CalendarProperty1Linear"]] as [ViewKey, string, string][]).map(([k, l, ic]) => (
-          <button key={k} onClick={() => setV(k)} style={{
-            display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 13px",
-            borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
-            fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700,
-            background: view === k ? "var(--surface-card)" : "transparent",
-            color: view === k ? "var(--text-primary)" : "var(--text-secondary)",
-            boxShadow: view === k ? "var(--shadow-sm)" : "none",
-            transition: "background .12s, color .12s",
-          }}>
-            <Icon name={ic} size={15} /> {l}
-          </button>
-        ))}
-      </div>
+      {canEdit && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: 4, background: "var(--surface-sunken, var(--surface-page))", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", alignSelf: "flex-start", flexWrap: "wrap" }}>
+          {([["list", "List", "FolderProperty1Linear"], ["board", "Board", "Element3Property1Linear"], ["timeline", "Timeline", "ChartProperty1Linear"], ["calendar", "Calendar", "CalendarProperty1Linear"]] as [ViewKey, string, string][]).map(([k, l, ic]) => (
+            <button key={k} onClick={() => setV(k)} style={{
+              display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 13px",
+              borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
+              fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700,
+              background: view === k ? "var(--surface-card)" : "transparent",
+              color: view === k ? "var(--text-primary)" : "var(--text-secondary)",
+              boxShadow: view === k ? "var(--shadow-sm)" : "none",
+              transition: "background .12s, color .12s",
+            }}>
+              <Icon name={ic} size={15} /> {l}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {view !== "list" && anyTaskViewFilter && searchedProjectTasks.length === 0 && (
+      {effectiveView !== "list" && anyTaskViewFilter && searchedProjectTasks.length === 0 && (
         <div style={{ padding: "18px 4px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
           No tasks match these filters.
         </div>
       )}
-      {view === "board" && <KanbanView tasks={searchedProjectTasks} onOpen={setEditTask} sortKey={sortKey} />}
-      {view === "timeline" && <TimelineView tasks={searchedProjectTasks} onOpen={setEditTask} sortKey={sortKey} />}
-      {view === "calendar" && <CalendarView tasks={searchedProjectTasks} onOpen={setEditTask} />}
+      {effectiveView === "board" && <KanbanView tasks={searchedProjectTasks} onOpen={setEditTask} sortKey={sortKey} />}
+      {effectiveView === "timeline" && <TimelineView tasks={searchedProjectTasks} onOpen={setEditTask} sortKey={sortKey} />}
+      {effectiveView === "calendar" && <CalendarView tasks={searchedProjectTasks} onOpen={setEditTask} />}
 
-      {view === "list" && (
+      {effectiveView === "list" && (
         <>
           {favourites.length > 0 && section("favourites", favourites, "")}
           {section("visible", visible, q ? "No projects match this search." : "No active projects — create your first one above.")}
@@ -338,7 +347,13 @@ export default function Projects() {
       )}
 
       {projModal && <ProjectEditModal project={projModal.project} onClose={() => setProjModal(null)} />}
-      {editTask && <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />}
+      {editTask && (canEdit
+        ? <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />
+        : (() => {
+            const proj = projects.find((p) => p.id === editTask.projectId);
+            return proj ? <TaskViewModal task={editTask} project={proj} onClose={() => setEditTask(null)} /> : null;
+          })()
+      )}
     </div>
   );
 }

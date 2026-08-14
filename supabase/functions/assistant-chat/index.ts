@@ -53,6 +53,24 @@ async function resolveProjectId(db: SupabaseClient, uid: string, project?: strin
   throw new Error(`no project matching "${project}"`);
 }
 
+// Same fuzzy-match helper, but constrained to a fixed set of project ids —
+// used for collaborator sessions, which may only ever see the project(s)
+// they were invited to, never the owner's full workspace.
+async function resolveScopedProjectId(db: SupabaseClient, allowedIds: string[], project?: string | null): Promise<string> {
+  if (!allowedIds.length) throw new Error("you don't have access to any projects");
+  if (!project) {
+    if (allowedIds.length === 1) return allowedIds[0];
+    throw new Error("which project? you have access to more than one");
+  }
+  if (allowedIds.includes(project)) return project;
+  const { data } = await db.from("projects").select("id, name").in("id", allowedIds).ilike("name", `%${project}%`);
+  const exact = data?.find((p) => p.name.toLowerCase() === project.toLowerCase());
+  if (exact) return exact.id;
+  if (data?.length === 1) return data[0].id;
+  if (data && data.length > 1) throw new Error(`project "${project}" is ambiguous: ${data.map((p) => p.name).join(", ")}`);
+  throw new Error(`no project matching "${project}" among the ones you have access to`);
+}
+
 /* ── tool catalogue (Anthropic tool-use schema) ── */
 
 const TOOLS = [
@@ -416,11 +434,135 @@ function makeHandlers(db: SupabaseClient, uid: string): Record<string, (args: Re
   };
 }
 
+/* ── Collaborator (client/team invite) mode ──
+   A collaborator only has active grants on specific projects (see
+   project_collaborators). This edge function runs on the service-role key,
+   which bypasses RLS entirely, so the tool handlers below do the scoping
+   themselves — every query is filtered to `allowedIds`, never to `uid`,
+   since the underlying rows are owned by whoever invited the collaborator,
+   not by the collaborator. Read-only: no create/update/delete/list_clients/
+   list_recent_meetings tools are exposed in this mode. */
+
+const COLLABORATOR_TOOLS = [
+  {
+    name: "list_projects",
+    description: "List the project(s) you have access to, with status, due date and task progress.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_project",
+    description: "Full context for one of your project(s): description, status, due date, bookmarked links, attachment filenames, and every task with its checklist and assignees.",
+    input_schema: {
+      type: "object",
+      properties: { project: { type: "string", description: "project name or id (only needed if you have access to more than one)" } },
+    },
+  },
+  {
+    name: "list_tasks",
+    description: "List tasks in your project(s). Checklist steps appear nested under their parent task.",
+    input_schema: {
+      type: "object",
+      properties: {
+        scope: { type: "string", enum: ["today", "overdue", "upcoming", "all"], default: "all" },
+        project: { type: "string", description: "filter by project name or id" },
+        include_done: { type: "boolean", default: false },
+      },
+    },
+  },
+] as const;
+
+function makeCollaboratorHandlers(db: SupabaseClient, allowedIds: string[]): Record<string, (args: Record<string, unknown>) => Promise<unknown>> {
+  return {
+    async list_projects() {
+      const [{ data: projects, error }, { data: tasks }] = await Promise.all([
+        db.from("projects").select("id, name, status, due").in("id", allowedIds).order("created_at"),
+        db.from("tasks").select("id, project_id, completed, parent_id").in("project_id", allowedIds),
+      ]);
+      if (error) throw new Error(error.message);
+      return (projects ?? []).map((p) => {
+        const list = (tasks ?? []).filter((t) => t.project_id === p.id && !t.parent_id);
+        return {
+          id: p.id,
+          name: p.name,
+          due: p.due,
+          status: p.status,
+          tasks_done: list.filter((t) => t.completed).length,
+          tasks_total: list.length,
+        };
+      });
+    },
+
+    async get_project({ project }) {
+      const pid = await resolveScopedProjectId(db, allowedIds, project as string | undefined);
+      const [{ data: p, error }, { data: tasks }, { data: links }, { data: attachments }] = await Promise.all([
+        db.from("projects").select("id, name, status, due, description").eq("id", pid).single(),
+        db.from("tasks").select("*").eq("project_id", pid),
+        db.from("project_links").select("url, title").eq("project_id", pid),
+        db.from("attachments").select("file_name, mime_type, size_bytes").eq("project_id", pid),
+      ]);
+      if (error || !p) throw new Error("project not found");
+      const taskIds = (tasks ?? []).map((t) => t.id);
+      const { data: assignees } = await db.from("task_assignees").select("task_id, person_id").in("task_id", taskIds);
+      const { data: people } = await db.from("people").select("id, name").in("id", (assignees ?? []).map((a) => a.person_id));
+      const pname = (id: string) => people?.find((pp) => pp.id === id)?.name ?? id;
+      const roots = (tasks ?? []).filter((t) => !t.parent_id);
+      const kids = (tasks ?? []).filter((t) => t.parent_id);
+      return {
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        due: p.due,
+        description: p.description || undefined,
+        links: links ?? [],
+        attachments: (attachments ?? []).map((a) => ({ ...a, note: "filename/metadata only — contents cannot be read yet" })),
+        tasks: roots.map((t) => ({
+          id: t.id,
+          title: t.title,
+          priority: t.priority,
+          status: t.status,
+          due: t.ends_at,
+          done: t.completed,
+          notes: t.notes || undefined,
+          assignees: (assignees ?? []).filter((a) => a.task_id === t.id).map((a) => pname(a.person_id)),
+          checklist: kids.filter((k) => k.parent_id === t.id).map((k) => ({ id: k.id, title: k.title, done: k.completed })),
+        })),
+      };
+    },
+
+    async list_tasks({ scope = "all", project, include_done = false }) {
+      const pid = project ? await resolveScopedProjectId(db, allowedIds, project as string) : null;
+      let q = db.from("tasks").select("*").in("project_id", pid ? [pid] : allowedIds).order("created_at", { ascending: false });
+      if (!include_done) q = q.eq("completed", false);
+      const today = iso(new Date());
+      if (scope === "today") q = q.lte("ends_at", today);
+      if (scope === "overdue") q = q.lt("ends_at", today);
+      if (scope === "upcoming") q = q.gt("ends_at", today);
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      const { data: projects } = await db.from("projects").select("id, name").in("id", allowedIds);
+      const pname = (id: string | null) => projects?.find((p) => p.id === id)?.name ?? "?";
+      const roots = (data ?? []).filter((t) => !t.parent_id);
+      const kids = (data ?? []).filter((t) => t.parent_id);
+      return roots.map((t) => ({
+        id: t.id,
+        title: t.title,
+        project: pname(t.project_id),
+        priority: t.priority,
+        status: t.status,
+        due: t.ends_at,
+        done: t.completed,
+        notes: t.notes || undefined,
+        checklist: kids.filter((k) => k.parent_id === t.id).map((k) => ({ id: k.id, title: k.title, done: k.completed })),
+      }));
+    },
+  };
+}
+
 /* ── Anthropic agentic loop ── */
 
 type ChatMessage = { role: "user" | "assistant"; content: unknown };
 
-async function callAnthropic(apiKey: string, system: string, messages: ChatMessage[]) {
+async function callAnthropic(apiKey: string, system: string, tools: unknown, messages: ChatMessage[]) {
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
     headers: {
@@ -432,7 +574,7 @@ async function callAnthropic(apiKey: string, system: string, messages: ChatMessa
       model: ANTHROPIC_MODEL,
       max_tokens: 2000,
       system,
-      tools: TOOLS,
+      tools,
       messages,
     }),
   });
@@ -454,6 +596,21 @@ function systemPrompt(projectId?: string) {
     `When judging urgency, priority, or what's "actually important" — never rank purely by due date. A close due date is one signal among several, and an untouched due date can just mean nobody's updated it. Before calling something urgent or stalled, weigh: the task's notes and checklist content (what does the work actually involve, and how far along does it look — not just the done/total count but whether the steps that exist are substantive), the priority field the user set, how long a task has sat with no status change, and the parent project's description and client context (e.g. an at-risk or high-ARR client's work matters more than its due date alone suggests). Say what evidence you're using, not just "X is due soon." (Meeting context via list_recent_meetings is a separate, narrower tool — see its own instructions below for when that's actually warranted.)`,
     `list_recent_meetings reads Fireflies meeting transcripts. It's a targeted lookup, not a default step — do NOT call it on routine planning/triage questions where task data alone answers the question. Only call it when: the user explicitly mentions a meeting/call/conversation ("what did we say on the call", "check the standup"), or you're assessing one specific task/project whose task data is genuinely ambiguous (no useful notes, stale status, but plausibly already resolved verbally) and confirming against a recent meeting would change your answer. When you do call it, scope from_date narrowly (e.g. the last 1-2 weeks unless the user implies otherwise) rather than pulling full history. It needs the FIREFLIES_API_KEY secret configured; if it errors, say so plainly instead of guessing at meeting content.`,
     `File attachments only expose filenames/metadata right now, not their contents — say so if asked to read inside a file.`,
+    `Be concise. Prefer short plans and bullet lists over long prose.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function collaboratorSystemPrompt(projectId?: string) {
+  const today = iso(new Date());
+  return [
+    `You are the Peak Focus in-app assistant. Today's date is ${today}.`,
+    `The person you're talking to is an invited collaborator (client or team member), not the workspace owner. They only have access to the specific project(s) they were added to — never mention or infer anything about other projects, clients, or workspace data, and if asked, say you can only see what they've been given access to.`,
+    `You are read-only for them: you can look things up with list_projects/get_project/list_tasks, but you have no tools to create, edit, complete, or delete anything. If they ask you to make a change, tell them to ask the project owner, or to leave a comment on the project/task for the owner to see.`,
+    `A common ask is "give me a status report" — when that happens, call get_project (or list_tasks) and produce a clear, concise summary: overall progress, what's done, what's in progress/blocked, and anything overdue. Use the evidence in task notes/checklists, not just due dates, to judge how real "in progress" is.`,
+    projectId ? `They're currently viewing project id ${projectId} — assume that's the subject unless they say otherwise.` : "",
+    `File attachments only expose filenames/metadata right now, not their contents.`,
     `Be concise. Prefer short plans and bullet lists over long prose.`,
   ]
     .filter(Boolean)
@@ -496,13 +653,25 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "messages is required" }), { status: 400, headers: { ...CORS, "content-type": "application/json" } });
   }
 
-  const handlers = makeHandlers(supa, uid);
+  // A collaborator is anyone with an active project grant who doesn't own
+  // any project themselves — the workspace owner never has grants, so this
+  // cleanly separates the two without needing a separate "role" flag.
+  const [{ count: ownedCount }, { data: grants }] = await Promise.all([
+    supa.from("projects").select("id", { count: "exact", head: true }).eq("user_id", uid),
+    supa.from("project_collaborators").select("project_id").eq("user_id", uid).eq("status", "active"),
+  ]);
+  const isCollaborator = !ownedCount && !!grants?.length;
+  const allowedProjectIds = (grants ?? []).map((g) => g.project_id);
+
+  const tools: unknown = isCollaborator ? COLLABORATOR_TOOLS : TOOLS;
+  const handlers = isCollaborator ? makeCollaboratorHandlers(supa, allowedProjectIds) : makeHandlers(supa, uid);
+  const system = isCollaborator ? collaboratorSystemPrompt(body.projectId) : systemPrompt(body.projectId);
   const messages: ChatMessage[] = [...history];
   const actions: { tool: string; args: unknown; result: unknown }[] = [];
 
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const data = await callAnthropic(apiKey, systemPrompt(body.projectId), messages);
+      const data = await callAnthropic(apiKey, system, tools, messages);
 
       if (data.stop_reason !== "tool_use") {
         const reply = (data.content ?? [])

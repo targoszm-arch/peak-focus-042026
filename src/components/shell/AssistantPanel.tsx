@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Icon } from "@/ds";
 import { supabase } from "@/lib/supabase";
+import { useAccess } from "@/hooks/use-access";
 
 type ChatMsg = {
   role: "user" | "assistant" | "error";
@@ -112,6 +113,7 @@ function renderMarkdown(text: string): React.ReactNode {
 }
 
 export default function AssistantPanel({ open, onClose, projectId }: { open: boolean; onClose: () => void; projectId?: string }) {
+  const { isOwner } = useAccess();
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -189,7 +191,9 @@ export default function AssistantPanel({ open, onClose, projectId }: { open: boo
         <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
           {messages.length === 0 && (
             <div style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", fontSize: 13.5, lineHeight: 1.5 }}>
-              Ask me to plan your day, summarize a project, or create/update tasks — I can read your projects, tasks, and clients, and act on them directly.
+              {isOwner === false
+                ? "Ask me for a status report on your project, or what's overdue or in progress — I can read the project(s) you've been given access to, but I can't make changes for you."
+                : "Ask me to plan your day, summarize a project, or create/update tasks — I can read your projects, tasks, and clients, and act on them directly."}
               {projectId && <div style={{ marginTop: 8 }}>Scoped to the project you're currently viewing, unless you ask about something else.</div>}
             </div>
           )}

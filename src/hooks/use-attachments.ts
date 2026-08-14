@@ -53,7 +53,9 @@ export function useAttachments(owner: { taskId?: string; projectId?: string }) {
       return;
     }
     setLoading(true);
-    let q = supabase.from("attachments").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    // No .eq("user_id", ...) filter — RLS returns rows the caller owns or
+    // has collaborator access to.
+    let q = supabase.from("attachments").select("*").order("created_at", { ascending: false });
     q = owner.taskId ? q.eq("task_id", owner.taskId) : q.eq("project_id", owner.projectId!);
     const { data, error: err } = await q;
     if (err) setError(err.message);
