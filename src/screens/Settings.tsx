@@ -7,7 +7,11 @@ import { useCollaborators } from "@/hooks/use-collaborators";
 import ShareProjectModal from "@/components/pf/ShareProjectModal";
 
 function AccessCard() {
-  const { projects } = useProjects();
+  const { user } = useAuth();
+  const { projects: allProjects } = useProjects();
+  // Only projects this account owns can have their access managed — a
+  // project it's merely a collaborator on doesn't belong here.
+  const projects = useMemo(() => allProjects.filter((p) => p.ownerId === user?.id), [allProjects, user?.id]);
   const { collaborators } = useCollaborators();
   const [manageId, setManageId] = useState<string | null>(null);
 

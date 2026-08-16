@@ -6,6 +6,7 @@ import { useClients } from "@/hooks/use-clients";
 import { useTasks, INBOX_ID, type Task, type Priority, type TaskStatus } from "@/hooks/use-tasks";
 import { usePeople } from "@/hooks/use-people";
 import { useAccess } from "@/hooks/use-access";
+import { useAuth } from "@/contexts/AuthContext";
 import { label as dueLabel, bucket } from "@/lib/pfdate";
 import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
 import TaskViewModal from "@/components/pf/TaskViewModal";
@@ -29,12 +30,18 @@ type SectionKey = keyof typeof SECTIONS;
 
 export default function Projects() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { isOwner } = useAccess();
+  // Global: does this account have its own workspace at all (creating
+  // projects, board/timeline/calendar). Per-project edit rights (below) are
+  // separate — the same account can own some projects and be a view-only
+  // collaborator on others at the same time.
   const canEdit = isOwner === true;
   const { projects } = useProjects();
   const { clients } = useClients();
   const { rootTasks, projectStats, assigneesByTask } = useTasks();
   const { people } = usePeople();
+  const ownedProjectIds = useMemo(() => new Set(projects.filter((p) => p.ownerId === user?.id).map((p) => p.id)), [projects, user?.id]);
 
   const [view, setView] = useState<ViewKey>(() => {
     try { return (localStorage.getItem(VIEW_KEY) as ViewKey) || "list"; } catch { return "list"; }
@@ -140,7 +147,11 @@ export default function Projects() {
   // them go dead, plus task-level status/priority filters.
   const matchingProjectIds = new Set(projects.filter(match).map((p) => p.id));
   const anyProjectFilter = !!(q || clientFilter || projectFilter);
+  // Board/Timeline/Calendar let you drag a task straight to a new status —
+  // a write with no confirmation step — so only ever feed them tasks from
+  // projects this account actually owns, never a view-only collaborator grant.
   const searchedProjectTasks = projectTasks.filter((t) => {
+    if (!ownedProjectIds.has(t.projectId)) return false;
     if (anyProjectFilter && !matchingProjectIds.has(t.projectId)) return false;
     if (statusFilter && t.status !== statusFilter) return false;
     if (priorityFilter && t.priority !== priorityFilter) return false;
@@ -347,13 +358,16 @@ export default function Projects() {
       )}
 
       {projModal && <ProjectEditModal project={projModal.project} onClose={() => setProjModal(null)} />}
-      {editTask && (canEdit
-        ? <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />
-        : (() => {
-            const proj = projects.find((p) => p.id === editTask.projectId);
-            return proj ? <TaskViewModal task={editTask} project={proj} onClose={() => setEditTask(null)} /> : null;
-          })()
-      )}
+      {editTask && (() => {
+        const proj = projects.find((p) => p.id === editTask.projectId);
+        // Ownership is per-project — a task's own project may not be one
+        // this account owns even if the account owns others.
+        return proj?.ownerId === user?.id
+          ? <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />
+          : proj
+          ? <TaskViewModal task={editTask} project={proj} onClose={() => setEditTask(null)} />
+          : null;
+      })()}
     </div>
   );
 }

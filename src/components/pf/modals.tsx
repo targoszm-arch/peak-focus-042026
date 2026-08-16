@@ -5,6 +5,7 @@ import { useTasks, type Task, type Priority, type TaskStatus, INBOX_ID } from "@
 import { useProjects, type ProjectFull } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { usePeople } from "@/hooks/use-people";
+import { useAuth } from "@/contexts/AuthContext";
 import { PRIORITY_TOKEN, PRIORITY_LABEL } from "./pf-helpers";
 import Attachments from "./Attachments";
 import RichText from "./RichText";
@@ -144,7 +145,11 @@ export function ModalShell({
 
 export function TaskEditModal({ task, onClose }: { task: Task; onClose: () => void }) {
   const { updateTaskFields, removeTask, addTask, toggleTask, childrenByParent, assigneesByTask, setAssignees } = useTasks();
-  const { projects } = useProjects();
+  const { user } = useAuth();
+  const { projects: allProjects } = useProjects();
+  // Reassignment can only ever target a project this account owns — never
+  // a project it merely has view-only collaborator access to.
+  const projects = allProjects.filter((p) => p.ownerId === user?.id);
   const { clients } = useClients();
   const { people } = usePeople();
 

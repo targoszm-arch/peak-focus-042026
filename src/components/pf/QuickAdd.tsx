@@ -4,6 +4,7 @@ import { Icon } from "@/ds";
 import { useTasks, type Priority } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useSpeechToText } from "@/hooks/use-speech-to-text";
+import { useAuth } from "@/contexts/AuthContext";
 import { PRIORITY_LABEL, PRIORITY_TOKEN, DUE_PRESETS, dueFromPreset } from "./pf-helpers";
 
 type Menu = "priority" | "project" | "due" | null;
@@ -20,7 +21,11 @@ export default function QuickAdd({
   onAdded?: () => void;
 }) {
   const { addTask } = useTasks();
-  const { projects } = useProjects();
+  const { user } = useAuth();
+  const { projects: allProjects } = useProjects();
+  // Only projects this account owns are eligible destinations — a
+  // view-only collaborator grant never lets you file tasks into it.
+  const projects = allProjects.filter((p) => p.ownerId === user?.id);
   const [name, setName] = useState("");
   const [priority, setPriority] = useState<Exclude<Priority, "none">>("medium");
   const [projectId, setProjectId] = useState<string | null>(defaultProjectId);
