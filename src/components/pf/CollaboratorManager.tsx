@@ -66,7 +66,7 @@ export default function CollaboratorManager({ projectId }: { projectId: string }
       {error && <div style={{ marginTop: 6, fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--red-500)" }}>{error}</div>}
       <div style={{ marginTop: 6, fontFamily: "var(--font-sans)", fontSize: 12, color: "var(--text-tertiary)" }}>
         They can view this project's tasks and attachments, comment, and ask the AI assistant for a status report — nothing else.
-        If they don't have an account yet, they just need to sign up at this address.
+        We'll email them a sign-up link at this address if they don't have an account yet.
       </div>
 
       <div style={{ marginTop: 16 }}>
