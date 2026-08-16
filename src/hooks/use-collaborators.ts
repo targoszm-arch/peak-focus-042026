@@ -73,7 +73,17 @@ export function useCollaborators(projectId?: string) {
         return null;
       }
       await reload();
-      return data ? rowToCollaborator(data) : null;
+      const collaborator = data ? rowToCollaborator(data) : null;
+      // The grant itself is already saved at this point — a failure here
+      // only means the notification email didn't go out, so surface it as
+      // a soft warning rather than undoing anything.
+      if (collaborator) {
+        const { error: sendErr } = await supabase.functions.invoke("send-collaborator-invite", {
+          body: { collaboratorId: collaborator.id },
+        });
+        if (sendErr) setError(`Access granted, but the invite email couldn't be sent (${sendErr.message}). Share the app link with them directly.`);
+      }
+      return collaborator;
     },
     [reload]
   );
