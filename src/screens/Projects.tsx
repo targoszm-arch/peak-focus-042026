@@ -1,13 +1,26 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon, ProgressBar, AvatarGroup } from "@/ds";
-import { useProjects, type ProjectFull } from "@/hooks/use-projects";
+import { useProjects, type ProjectFull, type ProjectStatus } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { useTasks, INBOX_ID } from "@/hooks/use-tasks";
 import { usePeople } from "@/hooks/use-people";
 import { useAccess } from "@/hooks/use-access";
 import { label as dueLabel, bucket } from "@/lib/pfdate";
 import { ProjectEditModal } from "@/components/pf/modals";
+import EditableProjectTable from "@/components/pf/EditableProjectTable";
+import { useEditableTable, DataTypes } from "@/hooks/use-editable-table";
+import type { TableColumn } from "@/components/pf/table/Table";
+
+const STATUS_OPTS = [
+  { label: "Active", value: "active", bg: "color-mix(in srgb, var(--primary-500) 18%, white)" },
+  { label: "On Hold", value: "on_hold", bg: "color-mix(in srgb, var(--secondary-500) 18%, white)" },
+  { label: "Done", value: "done", bg: "color-mix(in srgb, var(--green-600, #2A9E75) 18%, white)" },
+  { label: "Archived", value: "archived", bg: "var(--surface-sunken)" },
+] as const;
+const statusLabel = (v: string) => STATUS_OPTS.find((o) => o.value === v)?.label ?? v;
+const statusValue = (l: string) => STATUS_OPTS.find((o) => o.label === l)?.value;
+const isDateLike = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /* Projects — the project directory (Favourites · My Projects · Finished),
    plus Board / Timeline / Calendar views of the *projects themselves*
@@ -47,7 +60,7 @@ export default function Projects() {
   // Per-project edit rights are separate — the same account can own some
   // projects and be a view-only collaborator on others at the same time.
   const canEdit = isOwner === true;
-  const { projects } = useProjects();
+  const { projects, updateProject, addProject } = useProjects();
   const { clients } = useClients();
   const { rootTasks, projectStats, assigneesByTask } = useTasks();
   const { people } = usePeople();
@@ -199,6 +212,72 @@ export default function Projects() {
     );
   };
 
+  const fixedColumns: TableColumn[] = useMemo(
+    () => [
+      { id: "open", label: "", accessor: "open", dataType: "action", fixed: true, disableResizing: true, disableSortBy: true, width: 34, minWidth: 34 },
+      { id: "name", label: "Name", accessor: "name", dataType: DataTypes.TEXT, fixed: true, readOnly: !canEdit, width: 240 },
+      {
+        id: "client",
+        label: "Client",
+        accessor: "client",
+        dataType: DataTypes.SELECT,
+        fixed: true,
+        lockedOptions: true,
+        readOnly: !canEdit,
+        width: 160,
+        options: [{ label: "No client", backgroundColor: "var(--surface-sunken)" }, ...clients.map((c) => ({ label: c.name, backgroundColor: `color-mix(in srgb, ${c.color} 22%, white)` }))],
+      },
+      { id: "status", label: "Status", accessor: "status", dataType: DataTypes.SELECT, fixed: true, lockedOptions: true, readOnly: !canEdit, width: 120, options: STATUS_OPTS.map((o) => ({ label: o.label, backgroundColor: o.bg })) },
+      { id: "due", label: "Due", accessor: "due", dataType: DataTypes.TEXT, fixed: true, readOnly: !canEdit, width: 110 },
+      { id: "progress", label: "Progress", accessor: "progress", dataType: DataTypes.NUMBER, fixed: true, readOnly: true, align: "right", width: 90 },
+    ],
+    [clients, canEdit]
+  );
+
+  const onEditFixedField = useCallback(
+    (rowId: string, accessor: string, value: unknown) => {
+      const str = value == null ? "" : String(value);
+      if (accessor === "name") {
+        if (str.trim()) void updateProject(rowId, { name: str });
+        return;
+      }
+      if (accessor === "client") {
+        const match = clients.find((c) => c.name === str);
+        void updateProject(rowId, { clientId: match ? match.id : null });
+        return;
+      }
+      if (accessor === "status") {
+        const v = statusValue(str);
+        if (v) void updateProject(rowId, { status: v as ProjectStatus });
+        return;
+      }
+      if (accessor === "due") {
+        if (!str) void updateProject(rowId, { due: null });
+        else if (isDateLike(str)) void updateProject(rowId, { due: str });
+        return;
+      }
+    },
+    [updateProject, clients]
+  );
+
+  const { columns: tableColumns, getRowExtra, makeDispatch } = useEditableTable({
+    scope: "projects",
+    fixedColumns,
+    rowIds: useMemo(() => filteredForViews.map((p) => p.id), [filteredForViews]),
+    onEditFixedField,
+  });
+
+  const rowFields = useCallback(
+    (p: (typeof withStat)[number]) => ({
+      name: p.name,
+      client: clientById.get(p.clientId ?? "")?.name ?? "No client",
+      status: statusLabel(p.status),
+      due: p.due ?? "",
+      progress: p.s.pct,
+    }),
+    [clientById]
+  );
+
   const section = (key: SectionKey, list: typeof withStat, emptyText: string) => {
     const cfg = SECTIONS[key];
     const isCollapsed = !!collapsed[key];
@@ -219,10 +298,20 @@ export default function Projects() {
           </span>
         </button>
         {!isCollapsed && (
-          <div style={{ display: list.length > 0 ? "grid" : "block", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 8, marginTop: 4, padding: 4 }}>
-            {list.length > 0
-              ? list.map((p) => projectCard(p, key))
-              : <div style={{ padding: "10px 12px", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-tertiary)" }}>{emptyText}</div>}
+          <div style={{ marginTop: 4, padding: 4 }}>
+            {list.length > 0 ? (
+              <EditableProjectTable
+                projects={list}
+                columns={tableColumns}
+                rowFields={rowFields}
+                getRowExtra={getRowExtra}
+                makeDispatch={makeDispatch}
+                showAddRow={canEdit && key === "visible"}
+                onAddRow={() => void addProject({ name: "New project" })}
+              />
+            ) : (
+              <div style={{ padding: "10px 12px", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-tertiary)" }}>{emptyText}</div>
+            )}
           </div>
         )}
       </div>

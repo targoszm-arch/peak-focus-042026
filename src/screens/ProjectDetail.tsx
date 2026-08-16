@@ -3,8 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Icon, ProgressBar, AvatarGroup } from "@/ds";
 import QuickAdd from "@/components/pf/QuickAdd";
 import { TaskCardGrid } from "@/components/pf/ProjectViews";
-import Attachments from "@/components/pf/Attachments";
-import ProjectLinks from "@/components/pf/ProjectLinks";
+import ProjectWiki from "@/components/pf/ProjectWiki";
 import Comments from "@/components/pf/Comments";
 import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
 import ShareProjectModal from "@/components/pf/ShareProjectModal";
@@ -199,10 +198,7 @@ export default function ProjectDetail() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-        <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, boxSizing: "border-box", overflow: "hidden" }}>
-          <Attachments projectId={project.id} compact readOnly={!canEdit} />
-        </div>
-        <ProjectLinks projectId={project.id} readOnly={!canEdit} />
+        <ProjectWiki projectId={project.id} projectName={project.name} ownerId={project.ownerId} readOnly={!canEdit} />
         <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", padding: 18, boxSizing: "border-box" }}>
           <Comments projectId={project.id} ownerId={project.ownerId} />
         </div>

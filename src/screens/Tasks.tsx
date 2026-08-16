@@ -1,16 +1,46 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Card, Badge, Icon } from "@/ds";
 import QuickAdd from "@/components/pf/QuickAdd";
-import { TaskCardGrid, KanbanView, TimelineView, CalendarView } from "@/components/pf/ProjectViews";
+import { KanbanView, TimelineView, CalendarView } from "@/components/pf/ProjectViews";
+import EditableTaskTable from "@/components/pf/EditableTaskTable";
 import { TaskEditModal } from "@/components/pf/modals";
 import { useTasks, INBOX_ID, type Task, type Priority, type TaskStatus } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { useAuth } from "@/contexts/AuthContext";
 import { bucket, type Bucket } from "@/lib/pfdate";
+import { isoOffset } from "@/components/pf/pf-helpers";
+import { useEditableTable, DataTypes } from "@/hooks/use-editable-table";
+import type { TableColumn } from "@/components/pf/table/Table";
 
 type ViewKey = "list" | "board" | "timeline" | "calendar";
 const VIEW_KEY = "pf.tasks.view";
+
+const PRIORITY_OPTS = [
+  { label: "High", value: "high", bg: "color-mix(in srgb, var(--red-500) 18%, white)" },
+  { label: "Medium", value: "medium", bg: "color-mix(in srgb, var(--primary-500) 18%, white)" },
+  { label: "Low", value: "low", bg: "color-mix(in srgb, var(--neutral-400, #9aa3b2) 22%, white)" },
+  { label: "None", value: "none", bg: "var(--surface-sunken)" },
+] as const;
+const STATUS_OPTS = [
+  { label: "To Do", value: "todo", bg: "var(--surface-sunken)" },
+  { label: "In Progress", value: "progress", bg: "color-mix(in srgb, var(--primary-500) 18%, white)" },
+  { label: "In Review", value: "review", bg: "color-mix(in srgb, var(--secondary-500) 18%, white)" },
+  { label: "Done", value: "done", bg: "color-mix(in srgb, var(--green-600, #2A9E75) 18%, white)" },
+] as const;
+const priorityLabel = (v: string) => PRIORITY_OPTS.find((o) => o.value === v)?.label ?? v;
+const priorityValue = (l: string) => PRIORITY_OPTS.find((o) => o.label === l)?.value;
+const statusLabel = (v: string) => STATUS_OPTS.find((o) => o.value === v)?.label ?? v;
+const statusValue = (l: string) => STATUS_OPTS.find((o) => o.label === l)?.value;
+const isDateLike = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+// Adding a row from inside a bucket gives the new task a sensible due date
+// for that bucket, so it doesn't immediately vanish into a different group.
+function dueForGroup(key: string): string | null {
+  if (key === "today") return isoOffset(0);
+  if (key === "tomorrow") return isoOffset(1);
+  if (key === "week") return isoOffset(3);
+  return null;
+}
 
 const GROUPS: { key: Bucket | "done"; title: string }[] = [
   { key: "overdue", title: "Overdue" },
@@ -33,7 +63,7 @@ const selectStyle: React.CSSProperties = {
 
 export default function Tasks() {
   const { user } = useAuth();
-  const { rootTasks: allRootTasks } = useTasks();
+  const { rootTasks: allRootTasks, updateTaskFields, addTask } = useTasks();
   const { projects } = useProjects();
   const { clients } = useClients();
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -115,6 +145,76 @@ export default function Tasks() {
     remaining: rootTasks.filter((t) => !t.completed).length,
     completed: rootTasks.filter((t) => t.completed).length,
   }), [rootTasks]);
+
+  const fixedColumns: TableColumn[] = useMemo(
+    () => [
+      { id: "open", label: "", accessor: "open", dataType: "action", fixed: true, disableResizing: true, disableSortBy: true, width: 34, minWidth: 34 },
+      { id: "title", label: "Name", accessor: "title", dataType: DataTypes.TEXT, fixed: true, width: 260 },
+      {
+        id: "project",
+        label: "Project",
+        accessor: "project",
+        dataType: DataTypes.SELECT,
+        fixed: true,
+        lockedOptions: true,
+        width: 160,
+        options: [{ label: "Chores", backgroundColor: "var(--surface-sunken)" }, ...projects.map((p) => ({ label: p.name, backgroundColor: `color-mix(in srgb, ${p.color} 22%, white)` }))],
+      },
+      { id: "priority", label: "Priority", accessor: "priority", dataType: DataTypes.SELECT, fixed: true, lockedOptions: true, width: 110, options: PRIORITY_OPTS.map((o) => ({ label: o.label, backgroundColor: o.bg })) },
+      { id: "status", label: "Status", accessor: "status", dataType: DataTypes.SELECT, fixed: true, lockedOptions: true, width: 120, options: STATUS_OPTS.map((o) => ({ label: o.label, backgroundColor: o.bg })) },
+      { id: "due", label: "Due", accessor: "due", dataType: DataTypes.TEXT, fixed: true, width: 110 },
+    ],
+    [projects]
+  );
+
+  const onEditFixedField = useCallback(
+    (rowId: string, accessor: string, value: unknown) => {
+      const str = value == null ? "" : String(value);
+      if (accessor === "title") {
+        if (str.trim()) void updateTaskFields(rowId, { title: str });
+        return;
+      }
+      if (accessor === "project") {
+        const match = projects.find((p) => p.name === str);
+        void updateTaskFields(rowId, { projectId: match ? match.id : INBOX_ID });
+        return;
+      }
+      if (accessor === "priority") {
+        const v = priorityValue(str);
+        if (v) void updateTaskFields(rowId, { priority: v as Priority });
+        return;
+      }
+      if (accessor === "status") {
+        const v = statusValue(str);
+        if (v) void updateTaskFields(rowId, { status: v as TaskStatus });
+        return;
+      }
+      if (accessor === "due") {
+        if (!str) void updateTaskFields(rowId, { endsAt: null });
+        else if (isDateLike(str)) void updateTaskFields(rowId, { endsAt: str });
+        return;
+      }
+    },
+    [updateTaskFields, projects]
+  );
+
+  const { columns: tableColumns, getRowExtra, makeDispatch } = useEditableTable({
+    scope: "tasks",
+    fixedColumns,
+    rowIds: useMemo(() => filtered.map((t) => t.id), [filtered]),
+    onEditFixedField,
+  });
+
+  const rowFields = useCallback(
+    (t: Task) => ({
+      title: t.title,
+      project: projectById.get(t.projectId)?.name ?? "Chores",
+      priority: priorityLabel(t.priority),
+      status: statusLabel(t.status),
+      due: t.endsAt ? t.endsAt.slice(0, 10) : "",
+    }),
+    [projectById]
+  );
 
   return (
     <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 56px" }}>
@@ -221,7 +321,17 @@ export default function Tasks() {
                     <span style={{ flex: 1 }} />
                     <Icon name="ArrowDownProperty1Linear" size={15} style={{ color: "var(--text-tertiary)", transform: completedCollapsed ? "rotate(-90deg)" : "none", transition: "transform .2s" }} />
                   </button>
-                  {!completedCollapsed && <TaskCardGrid tasks={items} onOpen={setEditTask} />}
+                  {!completedCollapsed && (
+                    <EditableTaskTable
+                      tasks={items}
+                      columns={tableColumns}
+                      rowFields={rowFields}
+                      getRowExtra={getRowExtra}
+                      makeDispatch={makeDispatch}
+                      onOpen={setEditTask}
+                      showAddRow={false}
+                    />
+                  )}
                 </Card>
               );
             }
@@ -231,7 +341,15 @@ export default function Tasks() {
                   <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{g.title}</h3>
                   <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontWeight: 600 }}>{items.length}</span>
                 </div>
-                <TaskCardGrid tasks={items} onOpen={setEditTask} />
+                <EditableTaskTable
+                  tasks={items}
+                  columns={tableColumns}
+                  rowFields={rowFields}
+                  getRowExtra={getRowExtra}
+                  makeDispatch={makeDispatch}
+                  onOpen={setEditTask}
+                  onAddRow={() => void addTask({ title: "New task", endsAt: dueForGroup(g.key) })}
+                />
               </Card>
             );
           })}
