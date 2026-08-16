@@ -13,7 +13,7 @@ import { useTasks, type Task, type TaskStatus, type Priority } from "@/hooks/use
 import { useProjects } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { usePeople } from "@/hooks/use-people";
-import { useAccess } from "@/hooks/use-access";
+import { useAuth } from "@/contexts/AuthContext";
 import { label as dueLabel } from "@/lib/pfdate";
 import { linkifyHtml } from "@/lib/linkify";
 
@@ -30,7 +30,7 @@ const selectStyle: React.CSSProperties = {
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isOwner } = useAccess();
+  const { user } = useAuth();
   const { rootTasks, assigneesByTask } = useTasks();
   const { projects, updateProject } = useProjects();
   const { clients } = useClients();
@@ -43,13 +43,10 @@ export default function ProjectDetail() {
   const [priorityF, setPriorityF] = useState("");
   const [sortKey, setSortKey] = useState("due");
 
-  // The project owner sees the full workspace shell; anyone viewing here
-  // without owning the project is an invited collaborator (view + comment).
-  // Access resolves before this screen ever mounts (see the app-level gate),
-  // so isOwner is never null by the time we get here.
-  const canEdit = isOwner === true;
-
   const project = projects.find((p) => p.id === id) ?? null;
+  // Ownership is per-project, not per-account — the same account can own
+  // some projects and be a view-only collaborator on others.
+  const canEdit = !!project && project.ownerId === user?.id;
   const client = project ? clients.find((c) => c.id === project.clientId) ?? null : null;
 
   const list = useMemo(() => rootTasks.filter((t) => t.projectId === id), [rootTasks, id]);

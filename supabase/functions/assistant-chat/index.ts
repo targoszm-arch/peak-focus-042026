@@ -653,15 +653,21 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "messages is required" }), { status: 400, headers: { ...CORS, "content-type": "application/json" } });
   }
 
-  // A collaborator is anyone with an active project grant who doesn't own
-  // any project themselves — the workspace owner never has grants, so this
-  // cleanly separates the two without needing a separate "role" flag.
+  // Ownership is per-project, not per-account — the same account can own
+  // some projects and hold a view-only collaborator grant on others (e.g. a
+  // team member testing with their own workspace). So "am I a collaborator
+  // right now" depends on which project (if any) this chat is scoped to:
+  // if it's one they're granted but don't own, use the read-only
+  // collaborator toolset for exactly that project; otherwise fall back to
+  // their own full workspace.
   const [{ count: ownedCount }, { data: grants }] = await Promise.all([
     supa.from("projects").select("id", { count: "exact", head: true }).eq("user_id", uid),
     supa.from("project_collaborators").select("project_id").eq("user_id", uid).eq("status", "active"),
   ]);
-  const isCollaborator = !ownedCount && !!grants?.length;
-  const allowedProjectIds = (grants ?? []).map((g) => g.project_id);
+  const grantedProjectIds = (grants ?? []).map((g) => g.project_id);
+  const viewingGrantedProject = !!body.projectId && grantedProjectIds.includes(body.projectId);
+  const isCollaborator = viewingGrantedProject || (!ownedCount && grantedProjectIds.length > 0);
+  const allowedProjectIds = viewingGrantedProject ? [body.projectId as string] : grantedProjectIds;
 
   const tools: unknown = isCollaborator ? COLLABORATOR_TOOLS : TOOLS;
   const handlers = isCollaborator ? makeCollaboratorHandlers(supa, allowedProjectIds) : makeHandlers(supa, uid);

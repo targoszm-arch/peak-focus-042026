@@ -6,6 +6,7 @@ import { TaskEditModal } from "@/components/pf/modals";
 import { useTasks, INBOX_ID, type Task, type Priority, type TaskStatus } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
+import { useAuth } from "@/contexts/AuthContext";
 import { bucket, type Bucket } from "@/lib/pfdate";
 
 const GROUPS: { key: Bucket | "done"; title: string }[] = [
@@ -28,11 +29,21 @@ const selectStyle: React.CSSProperties = {
 };
 
 export default function Tasks() {
-  const { rootTasks, stats } = useTasks();
+  const { user } = useAuth();
+  const { rootTasks: allRootTasks } = useTasks();
   const { projects } = useProjects();
   const { clients } = useClients();
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [query, setQuery] = useState("");
+
+  // My Tasks is a personal planning view — exclude tasks that belong to a
+  // project this account is only a view-only collaborator on (those live
+  // in that project's own page, not mixed into your own task list).
+  const ownedProjectIds = useMemo(() => new Set(projects.filter((p) => p.ownerId === user?.id).map((p) => p.id)), [projects, user?.id]);
+  const rootTasks = useMemo(
+    () => allRootTasks.filter((t) => t.projectId === INBOX_ID || ownedProjectIds.has(t.projectId)),
+    [allRootTasks, ownedProjectIds]
+  );
 
   const load = (k: string, d = "") => { try { return localStorage.getItem(k) || d; } catch { return d; } };
   const save = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
@@ -93,12 +104,16 @@ export default function Tasks() {
 
   const anyFilter = !!(clientF || projectF || statusF || priorityF);
   const noResults = (q || anyFilter) && !GROUPS.some((g) => grouped[g.key].length > 0);
+  const myStats = useMemo(() => ({
+    remaining: rootTasks.filter((t) => !t.completed).length,
+    completed: rootTasks.filter((t) => t.completed).length,
+  }), [rootTasks]);
 
   return (
     <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 56px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
         <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "var(--text-primary)" }}>Tasks</h1>
-        <Badge tone="neutral">{stats.remaining} open · {stats.completed} done</Badge>
+        <Badge tone="neutral">{myStats.remaining} open · {myStats.completed} done</Badge>
       </div>
 
       <QuickAdd placeholder="Add a task…  (press Enter to save)" />
