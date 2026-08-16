@@ -14,12 +14,26 @@ function AccessCard() {
   const projects = useMemo(() => allProjects.filter((p) => p.ownerId === user?.id), [allProjects, user?.id]);
   const { collaborators } = useCollaborators();
   const [manageId, setManageId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [shareFilter, setShareFilter] = useState<"" | "shared" | "unshared">("");
 
   const countByProject = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of collaborators) map[c.projectId] = (map[c.projectId] ?? 0) + 1;
     return map;
   }, [collaborators]);
+
+  const visibleProjects = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return projects
+      .filter((p) => !q || p.name.toLowerCase().includes(q))
+      .filter((p) => {
+        if (!shareFilter) return true;
+        const shared = (countByProject[p.id] ?? 0) > 0;
+        return shareFilter === "shared" ? shared : !shared;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects, query, shareFilter, countByProject]);
 
   const manageProject = projects.find((p) => p.id === manageId) ?? null;
 
@@ -33,8 +47,36 @@ function AccessCard() {
       {projects.length === 0 ? (
         <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-tertiary)" }}>No projects yet.</div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {projects.map((p) => {
+        <>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, height: 38, padding: "0 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-sunken)", flex: "1 1 200px", minWidth: 0 }}>
+              <Icon name="SearchNormalProperty1Linear" size={15} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search projects"
+                style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-primary)" }}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, height: 38, padding: "0 10px 0 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: shareFilter ? "color-mix(in srgb, var(--primary-500) 8%, white)" : "var(--surface-sunken)", flexShrink: 0 }}>
+              <Icon name="Profile2userProperty1Linear" size={14} style={{ color: shareFilter ? "var(--primary-500)" : "var(--text-tertiary)", flexShrink: 0 }} />
+              <select
+                value={shareFilter}
+                onChange={(e) => setShareFilter(e.target.value as "" | "shared" | "unshared")}
+                aria-label="Filter by sharing status"
+                style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}
+              >
+                <option value="">All projects</option>
+                <option value="shared">Shared</option>
+                <option value="unshared">Not shared</option>
+              </select>
+            </div>
+          </div>
+          {visibleProjects.length === 0 ? (
+            <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "var(--text-tertiary)" }}>No projects match this search.</div>
+          ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {visibleProjects.map((p) => {
             const count = countByProject[p.id] ?? 0;
             return (
               <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 11px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)" }}>
@@ -56,7 +98,9 @@ function AccessCard() {
               </div>
             );
           })}
-        </div>
+          </div>
+          )}
+        </>
       )}
       {manageProject && <ShareProjectModal project={manageProject} onClose={() => setManageId(null)} />}
     </Card>
