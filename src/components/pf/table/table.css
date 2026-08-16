@@ -1,0 +1,56 @@
+/* Styling for the ported editable-react-table (src/components/pf/table/).
+   Structural class names/layout are kept faithful to the original; colors
+   and spacing use Peak Focus's own design tokens instead of the demo's
+   hardcoded greys, and every class is namespaced pf-tbl- so nothing here
+   collides with Tailwind's own utility classes of the same short names
+   (flex-1, overflow-hidden, cursor-pointer, etc. all exist in Tailwind). */
+
+.pf-tbl-table { display: inline-block; border-spacing: 0; font-family: var(--font-sans); font-size: 13.5px; min-width: 100%; }
+
+.pf-tbl-th,
+.pf-tbl-td { white-space: nowrap; margin: 0; border-left: 1px solid var(--border-soft); border-top: 1px solid var(--border-soft); position: relative; box-sizing: border-box; }
+.pf-tbl-th { border-bottom: 1px solid var(--border-soft); color: var(--text-secondary); font-weight: 600; cursor: pointer; background: var(--surface-sunken); }
+.pf-tbl-th:hover { background: color-mix(in srgb, var(--primary-500) 6%, var(--surface-sunken)); }
+.pf-tbl-td { overflow: hidden; color: var(--text-primary); align-items: stretch; padding: 0; display: flex; flex-direction: column; background: var(--surface-card); }
+.pf-tbl-tr:last-child .pf-tbl-td { border-bottom: 0; }
+.pf-tbl-td:last-child, .pf-tbl-th:last-child { border-right: 1px solid var(--border-soft); }
+.pf-tbl-tr:first-child .pf-tbl-td { border-top: 0; }
+
+.pf-tbl-th-content { overflow-x: hidden; text-overflow: ellipsis; padding: 0 10px; display: flex; align-items: center; height: 38px; }
+.pf-tbl-resizer { display: inline-block; background: transparent; width: 8px; height: 100%; position: absolute; right: 0; top: 0; transform: translateX(50%); z-index: 1; cursor: col-resize; touch-action: none; }
+.pf-tbl-resizer:hover { background: color-mix(in srgb, var(--primary-500) 40%, transparent); }
+
+.pf-tbl-cell-padding { padding: 8px 10px; }
+.pf-tbl-data-input { white-space: pre-wrap; border: none; padding: 8px 10px; color: var(--text-primary); font-size: 13.5px; font-family: var(--font-sans); border-radius: var(--radius-sm); resize: none; background: transparent; box-sizing: border-box; flex: 1 1 auto; outline: none; }
+.pf-tbl-data-input:focus { box-shadow: inset 0 0 0 1.5px var(--primary-500); }
+
+.pf-tbl-add-row { color: var(--text-tertiary); padding: 8px 10px; display: flex; align-items: center; font-size: 13px; font-weight: 600; cursor: pointer; height: 40px; border: 1px solid var(--border-soft); border-top: none; background: var(--surface-card); }
+.pf-tbl-add-row:hover { background: var(--surface-sunken); }
+
+.pf-tbl-overlay { position: fixed; inset: 0; z-index: 39; }
+.pf-tbl-shadow { box-shadow: var(--shadow-lg); }
+.pf-tbl-popper { background: var(--surface-card); border-radius: var(--radius-md); border: 1px solid var(--border-soft); }
+
+.pf-tbl-sort-button { padding: 7px 12px; width: 100%; background: transparent; border: 0; font-size: 13px; color: var(--text-secondary); cursor: pointer; text-align: left; display: flex; align-items: center; }
+.pf-tbl-sort-button:hover { background: var(--surface-sunken); }
+.pf-tbl-list-padding { padding: 4px 0; }
+
+.pf-tbl-form-input { padding: 8px 10px; background: var(--surface-sunken); border: none; border-radius: var(--radius-sm); font-size: 13.5px; color: var(--text-primary); font-family: var(--font-sans); }
+.pf-tbl-form-input:focus { outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-500) 40%, transparent); }
+.pf-tbl-fullwidth { width: 100%; box-sizing: border-box; }
+.pf-tbl-option-input { width: 100%; font-size: 13px; border: none; background: transparent; color: var(--text-primary); outline: none; }
+
+.pf-tbl-noselect, .pf-tbl-noselect * { -webkit-user-select: none; user-select: none; }
+.pf-tbl-flex { display: flex; }
+.pf-tbl-inline-block { display: inline-block; }
+.pf-tbl-flex-1 { flex: 1; }
+.pf-tbl-flex-wrap { flex-wrap: wrap; }
+.pf-tbl-items-center { align-items: center; }
+.pf-tbl-justify-center { justify-content: center; }
+.pf-tbl-cursor-pointer { cursor: pointer; }
+.pf-tbl-icon-margin { margin-right: 5px; }
+.pf-tbl-fw-600 { font-weight: 600; }
+.pf-tbl-fs-75 { font-size: 11px; }
+.pf-tbl-uppercase { text-transform: uppercase; letter-spacing: .04em; }
+.pf-tbl-capitalize { text-transform: capitalize; }
+.pf-tbl-text-right { text-align: right; }
