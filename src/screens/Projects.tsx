@@ -3,23 +3,35 @@ import { useNavigate } from "react-router-dom";
 import { Icon, ProgressBar, AvatarGroup } from "@/ds";
 import { useProjects, type ProjectFull } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
-import { useTasks, INBOX_ID, type Task, type Priority, type TaskStatus } from "@/hooks/use-tasks";
+import { useTasks, INBOX_ID } from "@/hooks/use-tasks";
 import { usePeople } from "@/hooks/use-people";
 import { useAccess } from "@/hooks/use-access";
-import { useAuth } from "@/contexts/AuthContext";
 import { label as dueLabel, bucket } from "@/lib/pfdate";
-import { ProjectEditModal, TaskEditModal } from "@/components/pf/modals";
-import TaskViewModal from "@/components/pf/TaskViewModal";
-import { KanbanView, TimelineView, CalendarView } from "@/components/pf/ProjectViews";
+import { ProjectEditModal } from "@/components/pf/modals";
 
-/* Projects — grouped directory (Favourites · My Projects · Finished) with
-   search, star-to-favourite, and Board / Timeline / Calendar views across all
-   project tasks. Ported from the design system's ProjectsScreen. */
+/* Projects — the project directory (Favourites · My Projects · Finished),
+   plus Board / Timeline / Calendar views of the *projects themselves*
+   (never tasks — task-level views live on the Tasks screen instead, so
+   switching a view here never turns this screen into a disguised task
+   list). Ported from the design system's ProjectsScreen. */
 
 type ViewKey = "list" | "board" | "timeline" | "calendar";
 const VIEW_KEY = "pf.projects.view";
 const STAR_KEY = "pf.projects.starred";
 const COL_KEY = "pf.projects.collapsed";
+
+const PROGRESS_COLUMNS = [
+  { key: "not_started", label: "Not started", dot: "var(--neutral-400, #9aa3b2)" },
+  { key: "in_progress", label: "In progress", dot: "var(--primary-500)" },
+  { key: "finished", label: "Finished", dot: "var(--green-600, #2A9E75)" },
+] as const;
+type ProgressColumn = (typeof PROGRESS_COLUMNS)[number]["key"];
+
+function progressColumnOf(p: { status: string; s: { pct: number } }): ProgressColumn {
+  if (p.status === "done" || p.s.pct === 100) return "finished";
+  if (p.s.pct > 0) return "in_progress";
+  return "not_started";
+}
 
 const SECTIONS = {
   visible: { tint: "var(--primary-500)", strong: "var(--primary-700, #1D50AF)", icon: "FolderProperty1Bold", label: "My Projects" },
@@ -30,24 +42,21 @@ type SectionKey = keyof typeof SECTIONS;
 
 export default function Projects() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { isOwner } = useAccess();
-  // Global: does this account have its own workspace at all (creating
-  // projects, board/timeline/calendar). Per-project edit rights (below) are
-  // separate — the same account can own some projects and be a view-only
-  // collaborator on others at the same time.
+  // Does this account have its own workspace at all (creating projects).
+  // Per-project edit rights are separate — the same account can own some
+  // projects and be a view-only collaborator on others at the same time.
   const canEdit = isOwner === true;
   const { projects } = useProjects();
   const { clients } = useClients();
   const { rootTasks, projectStats, assigneesByTask } = useTasks();
   const { people } = usePeople();
-  const ownedProjectIds = useMemo(() => new Set(projects.filter((p) => p.ownerId === user?.id).map((p) => p.id)), [projects, user?.id]);
 
   const [view, setView] = useState<ViewKey>(() => {
     try { return (localStorage.getItem(VIEW_KEY) as ViewKey) || "list"; } catch { return "list"; }
   });
-  const effectiveView: ViewKey = canEdit ? view : "list";
   const setV = (v: ViewKey) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } };
+  const [calMonth, setCalMonth] = useState(() => new Date());
 
   const [starred, setStarred] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem(STAR_KEY) || "[]")); } catch { return new Set(); }
@@ -79,20 +88,11 @@ export default function Projects() {
     try { return localStorage.getItem("pf.projects.project") || ""; } catch { return ""; }
   });
   const setPF = (v: string) => { setProjectFilter(v); try { localStorage.setItem("pf.projects.project", v); } catch { /* ignore */ } };
-  const [statusFilter, setStatusFilter] = useState<string>(() => {
-    try { return localStorage.getItem("pf.projects.status") || ""; } catch { return ""; }
-  });
-  const setSF = (v: string) => { setStatusFilter(v); try { localStorage.setItem("pf.projects.status", v); } catch { /* ignore */ } };
-  const [priorityFilter, setPriorityFilter] = useState<string>(() => {
-    try { return localStorage.getItem("pf.projects.priority") || ""; } catch { return ""; }
-  });
-  const setPrF = (v: string) => { setPriorityFilter(v); try { localStorage.setItem("pf.projects.priority", v); } catch { /* ignore */ } };
   const [sortKey, setSortKey] = useState<string>(() => {
     try { return localStorage.getItem("pf.projects.sort") || "name"; } catch { return "name"; }
   });
   const setSort = (v: string) => { setSortKey(v); try { localStorage.setItem("pf.projects.sort", v); } catch { /* ignore */ } };
   const [projModal, setProjModal] = useState<{ project: ProjectFull | null } | null>(null);
-  const [editTask, setEditTask] = useState<Task | null>(null);
 
   const clientById = useMemo(() => new Map(clients.map((c) => [c.id, c])), [clients]);
   const projectTasks = useMemo(() => rootTasks.filter((t) => t.projectId !== INBOX_ID), [rootTasks]);
@@ -141,23 +141,9 @@ export default function Projects() {
   const finishedIds = new Set(finished.map((p) => p.id));
   const visible = withStat.filter((p) => !finishedIds.has(p.id) && match(p));
   const favourites = visible.filter((p) => starred.has(p.id));
-
-  // Board/Timeline/Calendar don't have their own project rows to filter — apply
-  // the same search/client/project filters here so switching views doesn't make
-  // them go dead, plus task-level status/priority filters.
-  const matchingProjectIds = new Set(projects.filter(match).map((p) => p.id));
-  const anyProjectFilter = !!(q || clientFilter || projectFilter);
-  // Board/Timeline/Calendar let you drag a task straight to a new status —
-  // a write with no confirmation step — so only ever feed them tasks from
-  // projects this account actually owns, never a view-only collaborator grant.
-  const searchedProjectTasks = projectTasks.filter((t) => {
-    if (!ownedProjectIds.has(t.projectId)) return false;
-    if (anyProjectFilter && !matchingProjectIds.has(t.projectId)) return false;
-    if (statusFilter && t.status !== statusFilter) return false;
-    if (priorityFilter && t.priority !== priorityFilter) return false;
-    return true;
-  });
-  const anyTaskViewFilter = anyProjectFilter || !!statusFilter || !!priorityFilter;
+  // Board/Timeline/Calendar show every matching project regardless of the
+  // Favourites/My Projects/Finished split — that grouping is a List-only lens.
+  const filteredForViews = withStat.filter(match);
 
   const projectCard = (p: (typeof withStat)[number], sec: SectionKey) => {
     const c = clientById.get(p.clientId ?? "");
@@ -243,6 +229,198 @@ export default function Projects() {
     );
   };
 
+  const boardView = (
+    <div className="pf-hscroll" style={{ overflowX: "auto", paddingBottom: 6 }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${PROGRESS_COLUMNS.length}, minmax(260px, 1fr))`, gap: 14, minWidth: 0 }}>
+        {PROGRESS_COLUMNS.map((col) => {
+          const items = filteredForViews.filter((p) => progressColumnOf(p) === col.key);
+          return (
+            <div key={col.key} style={{ display: "flex", flexDirection: "column", gap: 10, padding: 10, borderRadius: "var(--radius-lg)", background: "var(--surface-page)", minHeight: 120 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 4px" }}>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: col.dot }} />
+                <span style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>{col.label}</span>
+                <span style={{ fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)", background: "var(--surface-card)", borderRadius: "var(--radius-full)", minWidth: 22, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 6px" }}>{items.length}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                {items.map((p) => projectCard(p, "visible"))}
+                {items.length === 0 && (
+                  <div style={{ padding: "18px 10px", textAlign: "center", fontFamily: "var(--font-sans)", fontSize: 12.5, color: "var(--text-tertiary)", border: "1px dashed var(--border-strong)", borderRadius: "var(--radius-md)" }}>
+                    No projects here
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // ── Timeline (gantt) — one bar per project, from when it was created to
+  // its due date (or a single-day marker at creation when there's no due). ──
+  const dayMs = 86400000;
+  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+  const parseDay = (iso: string | null): Date | null => {
+    if (!iso) return null;
+    const d = iso.length <= 10 ? new Date(iso + "T00:00:00") : new Date(iso);
+    return isNaN(d.getTime()) ? null : d;
+  };
+  const timelineRows = filteredForViews.map((p) => {
+    const start = startOfDay(new Date(p.createdAt));
+    const due = parseDay(p.due);
+    const end = due && due >= start ? startOfDay(due) : start;
+    return { p, start, end };
+  });
+  const now = startOfDay(new Date());
+  const timelineView = (() => {
+    if (timelineRows.length === 0) {
+      return (
+        <div style={{ padding: 40, textAlign: "center", color: "var(--text-tertiary)", fontFamily: "var(--font-sans)", fontSize: 14, background: "var(--surface-card)", border: "1px dashed var(--border-strong)", borderRadius: "var(--radius-lg)" }}>
+          No projects match these filters.
+        </div>
+      );
+    }
+    let min = timelineRows[0].start, max = timelineRows[0].end;
+    for (const r of timelineRows) {
+      if (r.start < min) min = r.start;
+      if (r.end > max) max = r.end;
+    }
+    min = new Date(min.getTime() - dayMs);
+    max = new Date(max.getTime() + dayMs);
+    const spanDays = Math.round((max.getTime() - min.getTime()) / dayMs) + 1;
+    const days = Array.from({ length: spanDays }, (_, i) => new Date(min.getTime() + i * dayMs));
+    const dayW = 42, rowH = 44, labelW = 240;
+    const todayIdx = Math.round((now.getTime() - min.getTime()) / dayMs);
+    const monthGroups: { key: string; label: string; startIdx: number; span: number }[] = [];
+    days.forEach((d, i) => {
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const last = monthGroups[monthGroups.length - 1];
+      if (last && last.key === key) last.span += 1;
+      else monthGroups.push({ key, label: d.toLocaleDateString("en-US", { month: "long", year: "numeric" }), startIdx: i, span: 1 });
+    });
+    const stickyLabelCell: React.CSSProperties = { position: "sticky", left: 0, zIndex: 3, background: "var(--surface-card)" };
+    return (
+      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ minWidth: `max(100%, ${labelW + spanDays * dayW}px)`, position: "relative" }}>
+            <div style={{ borderBottom: "1px solid var(--border-soft)" }}>
+              <div style={{ display: "flex", borderBottom: "1px solid var(--border-soft)" }}>
+                <div style={{ ...stickyLabelCell, width: labelW, flexShrink: 0, borderRight: "1px solid var(--border-soft)" }} />
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, flex: 1, minWidth: 0 }}>
+                  {monthGroups.map((g) => (
+                    <div key={g.key} style={{ gridColumn: `${g.startIdx + 1} / span ${g.span}`, padding: "6px 10px", borderLeft: g.startIdx > 0 ? "1px solid var(--border-soft)" : "none", fontFamily: "var(--font-sans)", fontSize: 11.5, fontWeight: 800, color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {g.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: "flex" }}>
+                <div style={{ ...stickyLabelCell, width: labelW, flexShrink: 0, padding: "10px 16px", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: "var(--text-tertiary)", borderRight: "1px solid var(--border-soft)" }}>Project</div>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, flex: 1, minWidth: 0 }}>
+                  {days.map((d, i) => {
+                    const isToday = i === todayIdx;
+                    const weekend = [0, 6].includes(d.getDay());
+                    return (
+                      <div key={i} style={{ minWidth: dayW, textAlign: "center", padding: "7px 0", background: weekend ? "var(--surface-page)" : "transparent" }}>
+                        <div style={{ fontFamily: "var(--font-sans)", fontSize: 10, fontWeight: 700, color: isToday ? "var(--primary-500)" : "var(--text-tertiary)", textTransform: "uppercase" }}>{d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2)}</div>
+                        <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: isToday ? 800 : 600, color: isToday ? "var(--primary-500)" : "var(--text-secondary)" }}>{d.getDate()}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            <div style={{ position: "relative" }}>
+              {todayIdx >= 0 && todayIdx < spanDays && (
+                <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(${labelW}px + ((100% - ${labelW}px) / ${spanDays}) * ${todayIdx + 0.5})`, width: 2, background: "color-mix(in srgb, var(--primary-500) 55%, transparent)", zIndex: 1, pointerEvents: "none" }} />
+              )}
+              {timelineRows.map(({ p, start, end }) => {
+                const startIndex = Math.round((start.getTime() - min.getTime()) / dayMs);
+                const duration = Math.round((end.getTime() - start.getTime()) / dayMs) + 1;
+                const c = clientById.get(p.clientId ?? "");
+                const col = c?.color ?? p.color;
+                return (
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", height: rowH, borderBottom: "1px solid var(--border-soft)" }}>
+                    <div onClick={() => navigate(`/projects/${p.id}`)} title="Open project" style={{ ...stickyLabelCell, width: labelW, flexShrink: 0, padding: "0 16px", borderRight: "1px solid var(--border-soft)", display: "flex", alignItems: "center", gap: 7, height: "100%", cursor: "pointer" }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: col, flexShrink: 0 }} />
+                      <span style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1, minWidth: 0 }}>{p.name}</span>
+                      <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 700, color: col, background: `color-mix(in srgb, ${col} 12%, white)`, borderRadius: "var(--radius-full)", padding: "2px 6px", flexShrink: 0 }}>{p.s.pct}%</span>
+                    </div>
+                    <div style={{ position: "relative", height: "100%", flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: `repeat(${spanDays}, minmax(${dayW}px, 1fr))`, alignItems: "center" }}>
+                      <div
+                        onClick={() => navigate(`/projects/${p.id}`)}
+                        title={`${p.name} · ${dueLabel(p.due)}`}
+                        style={{ gridColumn: `${startIndex + 1} / span ${duration}`, height: 22, margin: "0 3px", minWidth: 30, position: "relative", zIndex: 2, borderRadius: "var(--radius-full)", cursor: "pointer", background: `color-mix(in srgb, ${col} 20%, white)`, border: `1.5px solid ${col}` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  })();
+
+  // ── Calendar — projects placed on their due date. ──
+  const calendarView = (() => {
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const [y, m] = [calMonth.getFullYear(), calMonth.getMonth()];
+    const startDow = (new Date(y, m, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const cells: (Date | null)[] = [];
+    for (let i = 0; i < startDow; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(y, m, d));
+    while (cells.length % 7 !== 0) cells.push(null);
+    const todayIso = iso(new Date());
+    const dueIso = (p: (typeof withStat)[number]) => p.due;
+    const projectsOn = (d: Date) => filteredForViews.filter((p) => dueIso(p) === iso(d));
+    return (
+      <div style={{ background: "var(--surface-card)", border: "1px solid var(--border-soft)", borderRadius: "var(--radius-xl)", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderBottom: "1px solid var(--border-soft)" }}>
+          <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 800, color: "var(--text-primary)" }}>{calMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h3>
+          <span style={{ flex: 1 }} />
+          <button onClick={() => setCalMonth(new Date(y, m - 1, 1))} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", color: "var(--text-secondary)", cursor: "pointer" }} aria-label="Previous month"><Icon name="ArrowLeftProperty1Linear" size={16} /></button>
+          <button onClick={() => setCalMonth(new Date())} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: 34, padding: "0 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", color: "var(--text-secondary)", cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 12.5, fontWeight: 700 }}>Today</button>
+          <button onClick={() => setCalMonth(new Date(y, m + 1, 1))} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "var(--radius-md)", border: "1px solid var(--border-strong)", background: "var(--surface-card)", color: "var(--text-secondary)", cursor: "pointer" }} aria-label="Next month"><Icon name="ArrowRightProperty1Linear" size={16} /></button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid var(--border-soft)" }}>
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((w) => (
+            <div key={w} style={{ padding: "9px 0", textAlign: "center", fontFamily: "var(--font-sans)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--text-tertiary)" }}>{w}</div>
+          ))}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+          {cells.map((d, i) => {
+            if (!d) return <div key={i} style={{ minHeight: 130, borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none", borderBottom: "1px solid var(--border-soft)", background: "var(--surface-page)" }} />;
+            const list = projectsOn(d);
+            const isToday = iso(d) === todayIso;
+            const weekend = [0, 6].includes(d.getDay());
+            return (
+              <div key={i} style={{ minHeight: 130, padding: 7, borderRight: i % 7 !== 6 ? "1px solid var(--border-soft)" : "none", borderBottom: "1px solid var(--border-soft)", background: weekend ? "var(--surface-page)" : "var(--surface-card)" }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 5 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 22, height: 22, padding: "0 5px", borderRadius: "var(--radius-full)", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: isToday ? 800 : 600, background: isToday ? "var(--primary-500)" : "transparent", color: isToday ? "#fff" : "var(--text-secondary)" }}>{d.getDate()}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: 95, overflowY: "auto" }}>
+                  {list.map((p) => {
+                    const c = clientById.get(p.clientId ?? "");
+                    const col = c?.color ?? p.color;
+                    return (
+                      <div key={p.id} title={`Open ${p.name}`} onClick={() => navigate(`/projects/${p.id}`)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 6px", borderRadius: "var(--radius-sm)", background: `color-mix(in srgb, ${col} 13%, white)`, overflow: "hidden", cursor: "pointer" }}>
+                        <span style={{ width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: col }} />
+                        <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, lineHeight: 1.15, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  })();
+
   return (
     <div className="pf-page" style={{ width: "100%", maxWidth: "none", margin: 0, boxSizing: "border-box", padding: "28px 32px 48px", display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -279,28 +457,6 @@ export default function Projects() {
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
-        {effectiveView !== "list" && (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: statusFilter ? "color-mix(in srgb, var(--primary-500) 8%, white)" : "var(--surface-card)", flexShrink: 0 }}>
-              <Icon name="Element3Property1Linear" size={16} style={{ color: statusFilter ? "var(--primary-500)" : "var(--text-tertiary)", flexShrink: 0 }} />
-              <select value={statusFilter} onChange={(e) => setSF(e.target.value)} aria-label="Filter by status" style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}>
-                <option value="">All statuses</option>
-                {(["todo", "progress", "review", "done"] as TaskStatus[]).map((s) => (
-                  <option key={s} value={s}>{s === "todo" ? "To do" : s === "progress" ? "In progress" : s === "review" ? "In review" : "Done"}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: priorityFilter ? "color-mix(in srgb, var(--primary-500) 8%, white)" : "var(--surface-card)", flexShrink: 0 }}>
-              <Icon name="FlagProperty1Bold" size={16} style={{ color: priorityFilter ? "var(--primary-500)" : "var(--text-tertiary)", flexShrink: 0 }} />
-              <select value={priorityFilter} onChange={(e) => setPrF(e.target.value)} aria-label="Filter by priority" style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}>
-                <option value="">Any priority</option>
-                {(["high", "medium", "low", "none"] as Priority[]).map((p) => (
-                  <option key={p} value={p}>{p === "none" ? "None" : p[0].toUpperCase() + p.slice(1)}</option>
-                ))}
-              </select>
-            </div>
-          </>
-        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8, height: 42, padding: "0 12px 0 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)", flexShrink: 0 }}>
           <Icon name="ArrowDownProperty1Linear" size={16} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
           <select value={sortKey} onChange={(e) => setSort(e.target.value)} aria-label="Sort projects" style={{ border: "none", outline: "none", background: "transparent", fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "var(--text-primary)", cursor: "pointer" }}>
@@ -312,9 +468,9 @@ export default function Projects() {
             <option value="progress">Sort: Progress</option>
           </select>
         </div>
-        {(clientFilter || projectFilter || statusFilter || priorityFilter) && (
+        {(clientFilter || projectFilter) && (
           <button
-            onClick={() => { setCF(""); setPF(""); setSF(""); setPrF(""); }}
+            onClick={() => { setCF(""); setPF(""); }}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 42, padding: "0 12px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", background: "var(--surface-card)", cursor: "pointer", color: "var(--text-secondary)", fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700 }}
           >
             <Icon name="CloseCircleProperty1Linear" size={15} /> Clear
@@ -322,52 +478,34 @@ export default function Projects() {
         )}
       </div>
 
-      {canEdit && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: 4, background: "var(--surface-sunken, var(--surface-page))", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", alignSelf: "flex-start", flexWrap: "wrap" }}>
-          {([["list", "List", "FolderProperty1Linear"], ["board", "Board", "Element3Property1Linear"], ["timeline", "Timeline", "ChartProperty1Linear"], ["calendar", "Calendar", "CalendarProperty1Linear"]] as [ViewKey, string, string][]).map(([k, l, ic]) => (
-            <button key={k} onClick={() => setV(k)} style={{
-              display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 13px",
-              borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
-              fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700,
-              background: view === k ? "var(--surface-card)" : "transparent",
-              color: view === k ? "var(--text-primary)" : "var(--text-secondary)",
-              boxShadow: view === k ? "var(--shadow-sm)" : "none",
-              transition: "background .12s, color .12s",
-            }}>
-              <Icon name={ic} size={15} /> {l}
-            </button>
-          ))}
-        </div>
-      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: 4, background: "var(--surface-sunken, var(--surface-page))", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", alignSelf: "flex-start", flexWrap: "wrap" }}>
+        {([["list", "List", "FolderProperty1Linear"], ["board", "Board", "Element3Property1Linear"], ["timeline", "Timeline", "ChartProperty1Linear"], ["calendar", "Calendar", "CalendarProperty1Linear"]] as [ViewKey, string, string][]).map(([k, l, ic]) => (
+          <button key={k} onClick={() => setV(k)} style={{
+            display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 13px",
+            borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
+            fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700,
+            background: view === k ? "var(--surface-card)" : "transparent",
+            color: view === k ? "var(--text-primary)" : "var(--text-secondary)",
+            boxShadow: view === k ? "var(--shadow-sm)" : "none",
+            transition: "background .12s, color .12s",
+          }}>
+            <Icon name={ic} size={15} /> {l}
+          </button>
+        ))}
+      </div>
 
-      {effectiveView !== "list" && anyTaskViewFilter && searchedProjectTasks.length === 0 && (
-        <div style={{ padding: "18px 4px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-          No tasks match these filters.
-        </div>
-      )}
-      {effectiveView === "board" && <KanbanView tasks={searchedProjectTasks} onOpen={setEditTask} sortKey={sortKey} />}
-      {effectiveView === "timeline" && <TimelineView tasks={searchedProjectTasks} onOpen={setEditTask} sortKey={sortKey} />}
-      {effectiveView === "calendar" && <CalendarView tasks={searchedProjectTasks} onOpen={setEditTask} />}
-
-      {effectiveView === "list" && (
+      {view === "list" && (
         <>
           {favourites.length > 0 && section("favourites", favourites, "")}
           {section("visible", visible, q ? "No projects match this search." : "No active projects — create your first one above.")}
           {section("finished", finished, "No finished projects yet.")}
         </>
       )}
+      {view === "board" && boardView}
+      {view === "timeline" && timelineView}
+      {view === "calendar" && calendarView}
 
       {projModal && <ProjectEditModal project={projModal.project} onClose={() => setProjModal(null)} />}
-      {editTask && (() => {
-        const proj = projects.find((p) => p.id === editTask.projectId);
-        // Ownership is per-project — a task's own project may not be one
-        // this account owns even if the account owns others.
-        return proj?.ownerId === user?.id
-          ? <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />
-          : proj
-          ? <TaskViewModal task={editTask} project={proj} onClose={() => setEditTask(null)} />
-          : null;
-      })()}
     </div>
   );
 }

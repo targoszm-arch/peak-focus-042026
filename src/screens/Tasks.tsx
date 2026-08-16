@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
 import { Card, Badge, Icon } from "@/ds";
 import QuickAdd from "@/components/pf/QuickAdd";
-import { TaskCardGrid } from "@/components/pf/ProjectViews";
+import { TaskCardGrid, KanbanView, TimelineView, CalendarView } from "@/components/pf/ProjectViews";
 import { TaskEditModal } from "@/components/pf/modals";
 import { useTasks, INBOX_ID, type Task, type Priority, type TaskStatus } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { useClients } from "@/hooks/use-clients";
 import { useAuth } from "@/contexts/AuthContext";
 import { bucket, type Bucket } from "@/lib/pfdate";
+
+type ViewKey = "list" | "board" | "timeline" | "calendar";
+const VIEW_KEY = "pf.tasks.view";
 
 const GROUPS: { key: Bucket | "done"; title: string }[] = [
   { key: "overdue", title: "Overdue" },
@@ -35,6 +38,10 @@ export default function Tasks() {
   const { clients } = useClients();
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<ViewKey>(() => {
+    try { return (localStorage.getItem(VIEW_KEY) as ViewKey) || "list"; } catch { return "list"; }
+  });
+  const setV = (v: ViewKey) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } };
 
   // My Tasks is a personal planning view — exclude tasks that belong to a
   // project this account is only a view-only collaborator on (those live
@@ -180,48 +187,75 @@ export default function Tasks() {
         )}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
-        {GROUPS.map((g) => {
-          const items = grouped[g.key];
-          if (!items.length) return null;
-          if (g.key === "done") {
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: 4, marginTop: 12, background: "var(--surface-sunken, var(--surface-page))", borderRadius: "var(--radius-md)", border: "1px solid var(--border-soft)", alignSelf: "flex-start", flexWrap: "wrap" }}>
+        {([["list", "List", "TaskSquareProperty1Linear"], ["board", "Board", "Element3Property1Linear"], ["timeline", "Timeline", "ChartProperty1Linear"], ["calendar", "Calendar", "CalendarProperty1Linear"]] as [ViewKey, string, string][]).map(([k, l, ic]) => (
+          <button key={k} onClick={() => setV(k)} style={{
+            display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 13px",
+            borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
+            fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 700,
+            background: view === k ? "var(--surface-card)" : "transparent",
+            color: view === k ? "var(--text-primary)" : "var(--text-secondary)",
+            boxShadow: view === k ? "var(--shadow-sm)" : "none",
+            transition: "background .12s, color .12s",
+          }}>
+            <Icon name={ic} size={15} /> {l}
+          </button>
+        ))}
+      </div>
+
+      {view === "list" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
+          {GROUPS.map((g) => {
+            const items = grouped[g.key];
+            if (!items.length) return null;
+            if (g.key === "done") {
+              return (
+                <Card key={g.key} padding={18}>
+                  <button
+                    onClick={toggleCompletedCollapsed}
+                    aria-expanded={!completedCollapsed}
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: completedCollapsed ? 0 : 12, background: "transparent", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}
+                  >
+                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{g.title}</h3>
+                    <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontWeight: 600 }}>{items.length}</span>
+                    <span style={{ flex: 1 }} />
+                    <Icon name="ArrowDownProperty1Linear" size={15} style={{ color: "var(--text-tertiary)", transform: completedCollapsed ? "rotate(-90deg)" : "none", transition: "transform .2s" }} />
+                  </button>
+                  {!completedCollapsed && <TaskCardGrid tasks={items} onOpen={setEditTask} />}
+                </Card>
+              );
+            }
             return (
               <Card key={g.key} padding={18}>
-                <button
-                  onClick={toggleCompletedCollapsed}
-                  aria-expanded={!completedCollapsed}
-                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: completedCollapsed ? 0 : 12, background: "transparent", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}
-                >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                   <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{g.title}</h3>
                   <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontWeight: 600 }}>{items.length}</span>
-                  <span style={{ flex: 1 }} />
-                  <Icon name="ArrowDownProperty1Linear" size={15} style={{ color: "var(--text-tertiary)", transform: completedCollapsed ? "rotate(-90deg)" : "none", transition: "transform .2s" }} />
-                </button>
-                {!completedCollapsed && <TaskCardGrid tasks={items} onOpen={setEditTask} />}
+                </div>
+                <TaskCardGrid tasks={items} onOpen={setEditTask} />
               </Card>
             );
-          }
-          return (
-            <Card key={g.key} padding={18}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>{g.title}</h3>
-                <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontWeight: 600 }}>{items.length}</span>
-              </div>
-              <TaskCardGrid tasks={items} onOpen={setEditTask} />
-            </Card>
-          );
-        })}
-        {rootTasks.length === 0 && (
-          <div style={{ padding: "18px 4px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-            No tasks yet — add your first above.
-          </div>
-        )}
-        {noResults && (
-          <div style={{ padding: "18px 4px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-            No tasks match these filters.
-          </div>
-        )}
-      </div>
+          })}
+          {rootTasks.length === 0 && (
+            <div style={{ padding: "18px 4px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
+              No tasks yet — add your first above.
+            </div>
+          )}
+          {noResults && (
+            <div style={{ padding: "18px 4px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
+              No tasks match these filters.
+            </div>
+          )}
+        </div>
+      )}
+
+      {view !== "list" && noResults && (
+        <div style={{ padding: "18px 4px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 14, marginTop: 16 }}>
+          No tasks match these filters.
+        </div>
+      )}
+      {view === "board" && <div style={{ marginTop: 16 }}><KanbanView tasks={filtered} onOpen={setEditTask} sortKey={sortKey} /></div>}
+      {view === "timeline" && <div style={{ marginTop: 16 }}><TimelineView tasks={filtered} onOpen={setEditTask} sortKey={sortKey} /></div>}
+      {view === "calendar" && <div style={{ marginTop: 16 }}><CalendarView tasks={filtered} onOpen={setEditTask} /></div>}
 
       {editTask && <TaskEditModal task={editTask} onClose={() => setEditTask(null)} />}
     </div>
