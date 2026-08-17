@@ -11,7 +11,9 @@ type HeaderColumn = {
   label: string;
   dataType: string;
   fixed?: boolean;
-  getResizerProps: () => Record<string, unknown>;
+  // react-table only attaches this to columns that can actually resize —
+  // it's absent (not a no-op function) on any column with disableResizing.
+  getResizerProps?: () => Record<string, unknown>;
   getHeaderProps: () => Record<string, unknown>;
 };
 
@@ -38,14 +40,16 @@ export default function Header({
     return <AddColumnHeader dataDispatch={dataDispatch} getHeaderProps={getHeaderProps} />;
   }
 
+  const { key: headerCellKey, ...headerCellProps } = getHeaderProps();
+
   return (
     <>
-      <div {...getHeaderProps()} className="pf-tbl-th pf-tbl-noselect pf-tbl-inline-block">
+      <div {...headerCellProps} key={headerCellKey as React.Key} className="pf-tbl-th pf-tbl-noselect pf-tbl-inline-block">
         <div className="pf-tbl-th-content" onClick={() => setShowHeaderMenu(true)} ref={setAnchorRef}>
           <span className="pf-tbl-icon-margin" style={{ display: "inline-flex" }}><DataTypeIcon dataType={dataType} /></span>
           {label}
         </div>
-        <div {...getResizerProps()} className="pf-tbl-resizer" />
+        {getResizerProps && <div {...getResizerProps()} className="pf-tbl-resizer" />}
       </div>
       {showHeaderMenu && <div className="pf-tbl-overlay" onClick={() => setShowHeaderMenu(false)} />}
       {showHeaderMenu && (
