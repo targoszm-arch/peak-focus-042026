@@ -8,8 +8,10 @@ export default function AddColumnHeader({
   getHeaderProps: () => Record<string, unknown>;
   dataDispatch: (action: Record<string, unknown>) => void;
 }) {
+  const { key, ...headerProps } = getHeaderProps();
+
   return (
-    <div {...getHeaderProps()} className="pf-tbl-th pf-tbl-noselect pf-tbl-inline-block">
+    <div {...headerProps} key={key as React.Key} className="pf-tbl-th pf-tbl-noselect pf-tbl-inline-block">
       <div
         className="pf-tbl-th-content pf-tbl-flex pf-tbl-justify-center"
         onClick={() => dataDispatch({ type: ActionTypes.ADD_COLUMN_TO_LEFT, columnId: Constants.ADD_COLUMN_ID, focus: true })}

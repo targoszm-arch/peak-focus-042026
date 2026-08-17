@@ -113,13 +113,16 @@ export default function Table({
     <div style={{ maxWidth: "100%", overflow: "auto" }}>
       <div {...getTableProps()} className={clsx("pf-tbl-table", isTableResizing() && "pf-tbl-noselect")}>
         <div>
-          {headerGroups.map((headerGroup: any) => (
-            <div {...headerGroup.getHeaderGroupProps()} className="pf-tbl-tr" key={headerGroup.getHeaderGroupProps().key}>
-              {headerGroup.headers.map((column: any) => (
-                <span key={column.id}>{column.render("Header", { setSortBy })}</span>
-              ))}
-            </div>
-          ))}
+          {headerGroups.map((headerGroup: any) => {
+            const { key: headerGroupKey, ...headerGroupProps } = headerGroup.getHeaderGroupProps();
+            return (
+              <div {...headerGroupProps} className="pf-tbl-tr" key={headerGroupKey}>
+                {headerGroup.headers.map((column: any) => (
+                  <span key={column.id}>{column.render("Header", { setSortBy })}</span>
+                ))}
+              </div>
+            );
+          })}
         </div>
         <div {...getTableBodyProps()}>
           {rows.length > 0 && (
@@ -129,11 +132,14 @@ export default function Table({
                 prepareRow(row);
                 return (
                   <div {...row.getRowProps({ style })} className="pf-tbl-tr">
-                    {row.cells.map((cell: any) => (
-                      <div {...cell.getCellProps()} className="pf-tbl-td" key={cell.getCellProps().key}>
-                        {cell.render("Cell")}
-                      </div>
-                    ))}
+                    {row.cells.map((cell: any) => {
+                      const { key: cellKey, ...cellProps } = cell.getCellProps();
+                      return (
+                        <div {...cellProps} className="pf-tbl-td" key={cellKey}>
+                          {cell.render("Cell")}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               }}
