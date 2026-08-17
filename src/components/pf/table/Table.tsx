@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- react-table v7's plugin-hook generics
    (useBlockLayout + useResizeColumns + useSortBy composed) aren't expressible without a large
    bespoke type-augmentation file; the rest of this component is fully typed. */
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { useTable, useBlockLayout, useResizeColumns, useSortBy } from "react-table";
 import { FixedSizeList } from "react-window";
@@ -53,6 +53,7 @@ export default function Table({
   rowHeight = 40,
   maxHeight = 480,
   onRowAction,
+  fillColumnId,
 }: {
   columns: TableColumn[];
   data: Record<string, unknown>[];
@@ -62,7 +63,34 @@ export default function Table({
   rowHeight?: number;
   maxHeight?: number;
   onRowAction?: (rowIndex: number) => void;
+  /** Column id that should absorb any leftover width so the table fills its container instead of leaving a gap. */
+  fillColumnId?: string;
 }) {
+  // useBlockLayout renders every column at a fixed pixel width, so "fill the
+  // container" means measuring available space ourselves and stretching one
+  // column (the id/name column, by convention) to take up the remainder.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width) setContainerWidth(width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const effectiveColumns = useMemo(() => {
+    if (!fillColumnId || !containerWidth) return columns;
+    const fillCol = columns.find((c) => c.id === fillColumnId);
+    if (!fillCol) return columns;
+    const othersWidth = columns.filter((c) => c.id !== fillColumnId).reduce((sum, c) => sum + (c.width ?? defaultColumn.width), 0);
+    const fillWidth = Math.max(fillCol.minWidth ?? fillCol.width ?? defaultColumn.minWidth, containerWidth - othersWidth - 2);
+    return columns.map((c) => (c.id === fillColumnId ? { ...c, width: fillWidth } : c));
+  }, [columns, containerWidth, fillColumnId]);
+
   const sortTypes = useMemo(
     () => ({
       alphanumericFalsyLast(rowA: any, rowB: any, columnId: string, desc: boolean) {
@@ -79,7 +107,7 @@ export default function Table({
 
   const { getTableProps, getTableBodyProps, headerGroups, rows, prepareRow, totalColumnsWidth, setSortBy } = useTable(
     {
-      columns: columns as any,
+      columns: effectiveColumns as any,
       data: data as any,
       defaultColumn: defaultColumn as any,
       // react-table forwards unrecognized top-level options straight onto
@@ -110,7 +138,7 @@ export default function Table({
   const listHeight = Math.min(maxHeight, Math.max(rows.length, 1) * rowHeight);
 
   return (
-    <div style={{ maxWidth: "100%", overflow: "auto" }}>
+    <div ref={wrapperRef} style={{ maxWidth: "100%", overflow: "auto" }}>
       <div {...getTableProps()} className={clsx("pf-tbl-table", isTableResizing() && "pf-tbl-noselect")}>
         <div>
           {headerGroups.map((headerGroup: any) => {
