@@ -40,6 +40,7 @@ export type TableColumn = {
   align?: "right";
   width?: number;
   minWidth?: number;
+  maxWidth?: number;
   disableResizing?: boolean;
   disableSortBy?: boolean;
 };
@@ -87,8 +88,17 @@ export default function Table({
     const fillCol = columns.find((c) => c.id === fillColumnId);
     if (!fillCol) return columns;
     const othersWidth = columns.filter((c) => c.id !== fillColumnId).reduce((sum, c) => sum + (c.width ?? defaultColumn.width), 0);
-    const fillWidth = Math.max(fillCol.minWidth ?? fillCol.width ?? defaultColumn.minWidth, containerWidth - othersWidth - 2);
-    return columns.map((c) => (c.id === fillColumnId ? { ...c, width: fillWidth } : c));
+    // Reserve room for FixedSizeList's own vertical scrollbar (added back
+    // onto its `width` prop below) so a full group doesn't force an
+    // unwanted horizontal scrollbar on top of it.
+    const fillWidth = Math.max(
+      fillCol.minWidth ?? fillCol.width ?? defaultColumn.minWidth,
+      containerWidth - othersWidth - scrollbarWidth() - 2
+    );
+    // Override maxWidth too — otherwise defaultColumn's 480 cap (sized for
+    // a normal fixed column) clamps the fill column well short of the
+    // container on wide screens.
+    return columns.map((c) => (c.id === fillColumnId ? { ...c, width: fillWidth, maxWidth: Math.max(fillWidth, c.maxWidth ?? 0) } : c));
   }, [columns, containerWidth, fillColumnId]);
 
   const sortTypes = useMemo(
