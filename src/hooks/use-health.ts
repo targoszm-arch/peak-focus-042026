@@ -28,12 +28,16 @@ function rowToDay(r: any): OuraDay {
 
 function useHealthState() {
   const { user } = useAuth();
+  // Keyed off the stable id, not the user object — Supabase hands back a new
+  // session/user reference on every token refresh (e.g. on tab refocus),
+  // which would otherwise re-trigger this reload and flash the screen.
+  const userId = user?.id ?? null;
   const [days, setDays] = useState<OuraDay[]>([]);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setDays([]);
       setLoading(false);
       return;
@@ -44,15 +48,15 @@ function useHealthState() {
       supabase
         .from("oura_daily")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .gte("metric_date", since.toISOString().slice(0, 10))
         .order("metric_date", { ascending: true }),
-      supabase.from("oura_connections").select("user_id").eq("user_id", user.id).maybeSingle(),
+      supabase.from("oura_connections").select("user_id").eq("user_id", userId).maybeSingle(),
     ]);
     setDays((metrics ?? []).map(rowToDay));
     setConnected(!!conn);
     setLoading(false);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     void reload();

@@ -38,11 +38,15 @@ function rowToProject(r: any): ProjectFull {
 
 function useProjectsState() {
   const { user } = useAuth();
+  // Keyed off the stable id, not the user object — Supabase hands back a new
+  // session/user reference on every token refresh (e.g. on tab refocus),
+  // which would otherwise re-trigger this reload and flash the screen.
+  const userId = user?.id ?? null;
   const [projects, setProjects] = useState<ProjectFull[]>([]);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setProjects([]);
       setLoading(false);
       return;
@@ -56,7 +60,7 @@ function useProjectsState() {
     if (error) console.warn("[projects]", error.message);
     setProjects((data ?? []).map(rowToProject));
     setLoading(false);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     void reload();

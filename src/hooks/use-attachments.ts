@@ -39,6 +39,10 @@ export function formatBytes(n: number): string {
 /** Files attached to a single task or project. One owner id is required. */
 export function useAttachments(owner: { taskId?: string; projectId?: string }) {
   const { user } = useAuth();
+  // Keyed off the stable id, not the user object — Supabase hands back a new
+  // session/user reference on every token refresh (e.g. on tab refocus),
+  // which would otherwise re-trigger this reload and flash the screen.
+  const userId = user?.id ?? null;
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -47,7 +51,7 @@ export function useAttachments(owner: { taskId?: string; projectId?: string }) {
   const ownerKey = owner.taskId ?? owner.projectId ?? null;
 
   const reload = useCallback(async () => {
-    if (!user || !ownerKey) {
+    if (!userId || !ownerKey) {
       setAttachments([]);
       setLoading(false);
       return;
@@ -61,7 +65,7 @@ export function useAttachments(owner: { taskId?: string; projectId?: string }) {
     if (err) setError(err.message);
     setAttachments((data ?? []).map(rowToAttachment));
     setLoading(false);
-  }, [user, ownerKey, owner.taskId, owner.projectId]);
+  }, [userId, ownerKey, owner.taskId, owner.projectId]);
 
   useEffect(() => {
     void reload();

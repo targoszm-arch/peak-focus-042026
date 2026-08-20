@@ -36,12 +36,16 @@ function startOfWeek(d: Date): Date {
 
 function useTimeState() {
   const { user } = useAuth();
+  // Keyed off the stable id, not the user object — Supabase hands back a new
+  // session/user reference on every token refresh (e.g. on tab refocus),
+  // which would otherwise re-trigger this reload and flash the screen.
+  const userId = user?.id ?? null;
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [now, setNow] = useState(Date.now());
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setEntries([]);
       setLoading(false);
       return;
@@ -51,13 +55,13 @@ function useTimeState() {
     const { data, error } = await supabase
       .from("time_entries")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .gte("started_at", since.toISOString())
       .order("started_at", { ascending: false });
     if (error) console.warn("[time]", error.message);
     setEntries((data ?? []).map(rowToEntry));
     setLoading(false);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     void reload();
