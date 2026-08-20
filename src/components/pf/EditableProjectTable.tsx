@@ -35,6 +35,7 @@ export default function EditableProjectTable({
       dispatch={dispatch}
       showAddRow={showAddRow}
       onRowAction={(rowIndex) => { const p = projects[rowIndex]; if (p) navigate(`/projects/${p.id}`); }}
+      fillColumnId="name"
     />
   );
 }

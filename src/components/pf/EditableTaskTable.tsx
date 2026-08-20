@@ -35,6 +35,7 @@ export default function EditableTaskTable({
       dispatch={dispatch}
       showAddRow={showAddRow}
       onRowAction={(rowIndex) => { const t = tasks[rowIndex]; if (t) onOpen(t); }}
+      fillColumnId="title"
     />
   );
 }
