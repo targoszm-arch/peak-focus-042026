@@ -3,9 +3,14 @@ import { createPortal } from "react-dom";
 import { usePopper } from "react-popper";
 import Badge from "../Badge";
 import { PlusIcon } from "../img/icons";
-import { ActionTypes, randomColor } from "../utils";
+import { ActionTypes } from "../utils";
 
 export type SelectOption = { label: string; backgroundColor: string };
+
+// A fixed pastel palette (same HSL recipe the old randomColor() used) so a
+// new tag's color is a deliberate pick, not a random one — spaced evenly
+// around the hue wheel so adjacent swatches stay visually distinct.
+const TAG_COLORS = [0, 25, 45, 90, 160, 200, 230, 265, 300, 330].map((h) => `hsl(${h}, 85%, 88%)`);
 
 export default function SelectCell({
   initialValue,
@@ -30,6 +35,10 @@ export default function SelectCell({
   const [showSelect, setShowSelect] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [addSelectRef, setAddSelectRef] = useState<HTMLInputElement | null>(null);
+  // Rotates through the palette by option count so a fresh "add tag" row
+  // rarely pre-selects a color already in use, while still starting the
+  // user off with something rather than an empty swatch row.
+  const [pickedColor, setPickedColor] = useState(TAG_COLORS[options.length % TAG_COLORS.length]);
   const { styles, attributes } = usePopper(selectRef, selectPop, { placement: "bottom-start", strategy: "fixed" });
   const [value, setValue] = useState({ value: initialValue, update: false });
 
@@ -45,7 +54,11 @@ export default function SelectCell({
   }, [value.update, columnId, rowIndex]);
 
   useEffect(() => {
-    if (addSelectRef && showAdd) addSelectRef.focus();
+    if (addSelectRef && showAdd) {
+      addSelectRef.focus();
+      setPickedColor(TAG_COLORS[options.length % TAG_COLORS.length]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addSelectRef, showAdd]);
 
   const getColor = () => {
@@ -55,7 +68,7 @@ export default function SelectCell({
 
   const commitNewOption = (raw: string) => {
     if (raw !== "") {
-      dataDispatch({ type: ActionTypes.ADD_OPTION_TO_COLUMN, option: raw, backgroundColor: randomColor(), columnId });
+      dataDispatch({ type: ActionTypes.ADD_OPTION_TO_COLUMN, option: raw, backgroundColor: pickedColor, columnId });
     }
     setShowAdd(false);
   };
@@ -86,7 +99,22 @@ export default function SelectCell({
                 </div>
               ))}
               {!readOnly && !lockedOptions && showAdd && (
-                <div style={{ marginRight: 6, marginTop: 6, background: "var(--surface-sunken)", borderRadius: "var(--radius-sm)", width: 130, padding: "2px 6px" }}>
+                <div style={{ marginRight: 6, marginTop: 6, background: "var(--surface-sunken)", borderRadius: "var(--radius-sm)", width: 150, padding: "6px" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 5 }}>
+                    {TAG_COLORS.map((color) => (
+                      <div
+                        key={color}
+                        title="Tag color"
+                        // mousedown (not click) so picking a swatch doesn't
+                        // blur the text input first and commit early.
+                        onMouseDown={(e) => { e.preventDefault(); setPickedColor(color); }}
+                        style={{
+                          width: 16, height: 16, borderRadius: "50%", background: color, cursor: "pointer",
+                          boxShadow: pickedColor === color ? "0 0 0 2px var(--surface-sunken), 0 0 0 3.5px var(--primary-500)" : "none",
+                        }}
+                      />
+                    ))}
+                  </div>
                   <input
                     type="text"
                     className="pf-tbl-option-input"
