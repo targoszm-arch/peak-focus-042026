@@ -166,12 +166,16 @@ async function migrateLocalStorageOnce(userId: string) {
 
 function useTasksState() {
   const { user } = useAuth();
+  // Keyed off the stable id, not the user object — Supabase hands back a new
+  // session/user reference on every token refresh (e.g. on tab refocus),
+  // which would otherwise re-trigger this reload and flash the screen.
+  const userId = user?.id ?? null;
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [assigneesByTask, setAssigneesByTask] = useState<Record<string, string[]>>({});
 
   const reload = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setTasks([]);
       setProjects([]);
       setAssigneesByTask({});
@@ -199,12 +203,12 @@ function useTasksState() {
       (map[row.task_id] ??= []).push(row.person_id);
     }
     setAssigneesByTask(map);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
-    if (!user) return;
-    migrateLocalStorageOnce(user.id).then(reload);
-  }, [user, reload]);
+    if (!userId) return;
+    migrateLocalStorageOnce(userId).then(reload);
+  }, [userId, reload]);
 
   const addTask = useCallback(
     async (

@@ -34,11 +34,15 @@ function rowToColumn(r: any): CustomColumn {
  */
 export function useCustomColumns(scope: "tasks" | "projects") {
   const { user } = useAuth();
+  // Keyed off the stable id, not the user object — Supabase hands back a new
+  // session/user reference on every token refresh (e.g. on tab refocus),
+  // which would otherwise re-trigger this reload and flash the screen.
+  const userId = user?.id ?? null;
   const [columns, setColumns] = useState<CustomColumn[]>([]);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setColumns([]);
       setLoading(false);
       return;
@@ -51,7 +55,7 @@ export function useCustomColumns(scope: "tasks" | "projects") {
       .order("position", { ascending: true });
     setColumns((data ?? []).map(rowToColumn));
     setLoading(false);
-  }, [user, scope]);
+  }, [userId, scope]);
 
   useEffect(() => {
     void reload();

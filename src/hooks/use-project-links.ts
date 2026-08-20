@@ -24,12 +24,16 @@ function rowToLink(r: any): ProjectLink {
 /** Bookmarked URLs on a single project, newest first. */
 export function useProjectLinks(projectId?: string) {
   const { user } = useAuth();
+  // Keyed off the stable id, not the user object — Supabase hands back a new
+  // session/user reference on every token refresh (e.g. on tab refocus),
+  // which would otherwise re-trigger this reload and flash the screen.
+  const userId = user?.id ?? null;
   const [links, setLinks] = useState<ProjectLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    if (!user || !projectId) {
+    if (!userId || !projectId) {
       setLinks([]);
       setLoading(false);
       return;
@@ -45,7 +49,7 @@ export function useProjectLinks(projectId?: string) {
     if (err) setError(err.message);
     setLinks((data ?? []).map(rowToLink));
     setLoading(false);
-  }, [user, projectId]);
+  }, [userId, projectId]);
 
   useEffect(() => {
     void reload();

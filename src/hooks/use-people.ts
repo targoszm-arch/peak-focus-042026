@@ -34,11 +34,15 @@ function rowToPerson(r: any): Person {
 
 function usePeopleState() {
   const { user } = useAuth();
+  // Keyed off the stable id, not the user object — Supabase hands back a new
+  // session/user reference on every token refresh (e.g. on tab refocus),
+  // which would otherwise re-trigger this reload and flash the screen.
+  const userId = user?.id ?? null;
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setPeople([]);
       setLoading(false);
       return;
@@ -52,7 +56,7 @@ function usePeopleState() {
     if (error) console.warn("[people]", error.message);
     setPeople((data ?? []).map(rowToPerson));
     setLoading(false);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     void reload();

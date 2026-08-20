@@ -22,13 +22,20 @@ export type CollaboratorRole = "client" | "team";
  */
 function useAccessState() {
   const { user } = useAuth();
+  // Supabase silently re-fires onAuthStateChange with a new session/user
+  // object on every token refresh (notably whenever the tab regains focus),
+  // even though the signed-in account hasn't changed. Keying off the stable
+  // user id — instead of the object reference — stops reload() (and the
+  // full-tree "Loading…" gate it drives via AccessGate) from re-running on
+  // every one of those refreshes.
+  const userId = user?.id ?? null;
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
   const [grantedProjectIds, setGrantedProjectIds] = useState<string[]>([]);
   const [role, setRole] = useState<CollaboratorRole | null>(null);
 
   const reload = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setLoading(false);
       setIsOwner(null);
       setGrantedProjectIds([]);
@@ -37,15 +44,15 @@ function useAccessState() {
     }
     setLoading(true);
     const [{ count: owned }, { data: grants }] = await Promise.all([
-      supabase.from("projects").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-      supabase.from("project_collaborators").select("project_id, role").eq("user_id", user.id).eq("status", "active"),
+      supabase.from("projects").select("id", { count: "exact", head: true }).eq("user_id", userId),
+      supabase.from("project_collaborators").select("project_id, role").eq("user_id", userId).eq("status", "active"),
     ]);
     const collaborator = !owned && !!grants?.length;
     setIsOwner(!collaborator);
     setGrantedProjectIds((grants ?? []).map((g) => g.project_id as string));
     setRole((grants?.[0]?.role as CollaboratorRole | undefined) ?? null);
     setLoading(false);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     void reload();

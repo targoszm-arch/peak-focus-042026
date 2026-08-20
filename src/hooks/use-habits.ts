@@ -175,21 +175,25 @@ async function migrateHabitsLocalOnce(userId: string) {
 
 function useHabitsState() {
   const { user } = useAuth();
+  // Keyed off the stable id, not the user object — Supabase hands back a new
+  // session/user reference on every token refresh (e.g. on tab refocus),
+  // which would otherwise re-trigger this reload and flash the screen.
+  const userId = user?.id ?? null;
   const [habits, setHabits] = useState<Habit[]>([]);
   const [entries, setEntries] = useState<Record<string, DailyEntry>>({});
 
   const today = todayKey();
 
   const reload = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setHabits([]);
       setEntries({});
       return;
     }
     const [{ data: hs }, { data: ents }, { data: logs }] = await Promise.all([
-      supabase.from("habits").select("*").eq("user_id", user.id).order("created_at"),
-      supabase.from("daily_entries").select("*").eq("user_id", user.id),
-      supabase.from("habit_logs").select("*").eq("user_id", user.id).eq("done", true),
+      supabase.from("habits").select("*").eq("user_id", userId).order("created_at"),
+      supabase.from("daily_entries").select("*").eq("user_id", userId),
+      supabase.from("habit_logs").select("*").eq("user_id", userId).eq("done", true),
     ]);
     const habitList: Habit[] = (hs ?? []).map((h: any) => ({
       id: h.id,
@@ -223,16 +227,16 @@ function useHabitsState() {
       if (hkey) entryMap[k].habits[hkey] = true;
     }
     setEntries(entryMap);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     (async () => {
-      await ensureSeedHabits(user.id);
-      await migrateHabitsLocalOnce(user.id);
+      await ensureSeedHabits(userId);
+      await migrateHabitsLocalOnce(userId);
       await reload();
     })();
-  }, [user, reload]);
+  }, [userId, reload]);
 
   const todayEntry = useMemo(
     () => entries[today] ?? blankEntry(today),
