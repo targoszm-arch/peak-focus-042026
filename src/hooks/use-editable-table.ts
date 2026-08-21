@@ -71,6 +71,10 @@ export function useEditableTable({
   const { columns: customCols, loading, addColumn, renameColumn, setColumnType, addOption, deleteColumn } = useCustomColumns(scope);
   const { values: customValues, setValue: setCustomValue } = useCustomFieldValues(scope, rowIds);
   const customColumnIds = useMemo(() => new Set(customCols.map((c) => c.id)), [customCols]);
+  // The column just added via "+" gets its header menu auto-opened once (see
+  // Table's `created` prop) so "text vs select" isn't a silent no-op — this
+  // clears back to null once the user dismisses that menu.
+  const [justCreatedId, setJustCreatedId] = useState<string | null>(null);
 
   const columns: TableColumn[] = useMemo(() => {
     const custom: TableColumn[] = customCols.map((c) => ({
@@ -79,13 +83,14 @@ export function useEditableTable({
       accessor: c.id,
       dataType: c.dataType,
       options: c.options,
+      created: c.id === justCreatedId,
     }));
     return [
       ...fixedColumns,
       ...custom,
       { id: Constants.ADD_COLUMN_ID, label: "+", accessor: Constants.ADD_COLUMN_ID, dataType: "null", disableResizing: true, disableSortBy: true, width: 40 },
     ];
-  }, [fixedColumns, customCols]);
+  }, [fixedColumns, customCols, justCreatedId]);
 
   /** custom_fields values for one row, spread into its display object under each custom column's id. */
   const getRowExtra = useCallback((rowId: string) => customValues[rowId] ?? {}, [customValues]);
@@ -116,8 +121,15 @@ export function useEditableTable({
           // Simplification: new custom columns are always appended at the
           // end rather than spliced next to the column that was clicked —
           // exact ordering among custom columns isn't load-bearing here.
-          void addColumn(customCols.length);
+          void addColumn(customCols.length).then((col) => {
+            if (col) setJustCreatedId(col.id);
+          });
           return;
+        case ActionTypes.DISMISS_CREATED: {
+          const columnId = action.columnId as string;
+          setJustCreatedId((prev) => (prev === columnId ? null : prev));
+          return;
+        }
         case ActionTypes.DELETE_COLUMN: {
           const columnId = action.columnId as string;
           if (!customColumnIds.has(columnId)) return; // fixed columns can't be deleted

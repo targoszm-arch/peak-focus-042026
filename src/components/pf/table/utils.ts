@@ -7,10 +7,6 @@ export function shortId() {
   return "_" + Math.random().toString(36).substr(2, 9);
 }
 
-export function randomColor() {
-  return `hsl(${Math.floor(Math.random() * 360)}, 85%, 88%)`;
-}
-
 export const ActionTypes = Object.freeze({
   ADD_OPTION_TO_COLUMN: "add_option_to_column",
   ADD_ROW: "add_row",
@@ -21,6 +17,10 @@ export const ActionTypes = Object.freeze({
   ADD_COLUMN_TO_RIGHT: "add_column_to_right",
   DELETE_COLUMN: "delete_column",
   ENABLE_RESET: "enable_reset",
+  // A brand-new column auto-opens its header menu so the "text vs select"
+  // choice isn't hidden; this clears that one-shot flag once the user
+  // dismisses the menu, so it doesn't keep popping back open.
+  DISMISS_CREATED: "dismiss_created",
 });
 
 export const DataTypes = Object.freeze({

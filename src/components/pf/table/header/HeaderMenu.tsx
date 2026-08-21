@@ -2,14 +2,20 @@ import { useEffect, useState } from "react";
 import { usePopper } from "react-popper";
 import { ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, TrashIcon } from "../img/icons";
 import TypesMenu from "./TypesMenu";
-import { ActionTypes, shortId } from "../utils";
+import { ActionTypes, DataTypes, shortId } from "../utils";
 import DataTypeIcon from "./DataTypeIcon";
+import Badge from "../Badge";
+
+export type SelectOption = { label: string; backgroundColor: string };
 
 export default function HeaderMenu({
   label,
   dataType,
   columnId,
   fixed,
+  options,
+  filterValue,
+  setFilter,
   setSortBy,
   popperStyle,
   popperAttrs,
@@ -21,6 +27,9 @@ export default function HeaderMenu({
   dataType: string;
   columnId: string;
   fixed?: boolean;
+  options?: SelectOption[];
+  filterValue?: string[];
+  setFilter?: (value: string[] | undefined) => void;
   setSortBy: (v: { id: string; desc: boolean }[]) => void;
   popperStyle: React.CSSProperties;
   popperAttrs: Record<string, unknown>;
@@ -45,6 +54,14 @@ export default function HeaderMenu({
 
   const commitLabel = () => {
     if (!fixed) dataDispatch({ type: ActionTypes.UPDATE_COLUMN_HEADER, columnId, label: header });
+  };
+
+  const canFilter = dataType === DataTypes.SELECT && !!options?.length && !!setFilter;
+  const toggleFilterValue = (optionLabel: string) => {
+    if (!setFilter) return;
+    const current = filterValue ?? [];
+    const next = current.includes(optionLabel) ? current.filter((v) => v !== optionLabel) : [...current, optionLabel];
+    setFilter(next.length ? next : undefined);
   };
 
   const buttons = [
@@ -121,6 +138,40 @@ export default function HeaderMenu({
               />
             )}
           </div>
+        )}
+        {canFilter && (
+          <>
+            <div style={{ borderTop: "1px solid var(--border-soft)" }} />
+            <div style={{ padding: "8px 10px 4px" }}>
+              <span className="pf-tbl-fw-600 pf-tbl-fs-75 pf-tbl-uppercase" style={{ color: "var(--text-tertiary)" }}>Filter by value</span>
+            </div>
+            <div style={{ padding: "2px 10px 8px", display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {options!.map((o) => {
+                const active = !!filterValue?.includes(o.label);
+                return (
+                  <div
+                    key={o.label}
+                    className="pf-tbl-cursor-pointer"
+                    onClick={() => toggleFilterValue(o.label)}
+                    style={{ opacity: filterValue?.length && !active ? 0.4 : 1, boxShadow: active ? "0 0 0 1.5px var(--primary-500)" : "none", borderRadius: "var(--radius-sm)" }}
+                  >
+                    <Badge value={o.label} backgroundColor={o.backgroundColor} />
+                  </div>
+                );
+              })}
+            </div>
+            {!!filterValue?.length && (
+              <div style={{ padding: "0 10px 8px" }}>
+                <button
+                  type="button"
+                  onClick={() => setFilter!(undefined)}
+                  style={{ background: "transparent", border: "none", padding: 0, color: "var(--primary-500)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
+                >
+                  Clear filter
+                </button>
+              </div>
+            )}
+          </>
         )}
         <div style={{ borderTop: "1px solid var(--border-soft)" }} />
         <div className="pf-tbl-list-padding">

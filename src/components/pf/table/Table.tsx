@@ -3,7 +3,7 @@
    bespoke type-augmentation file; the rest of this component is fully typed. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { useTable, useBlockLayout, useResizeColumns, useSortBy } from "react-table";
+import { useTable, useBlockLayout, useFilters, useResizeColumns, useSortBy } from "react-table";
 import { FixedSizeList } from "react-window";
 import Cell from "./cells/Cell";
 import Header from "./header/Header";
@@ -43,6 +43,9 @@ export type TableColumn = {
   maxWidth?: number;
   disableResizing?: boolean;
   disableSortBy?: boolean;
+  /** True for exactly one render right after this column was added, so its
+   *  header menu can auto-open (see use-editable-table.ts's DISMISS_CREATED). */
+  created?: boolean;
 };
 
 export default function Table({
@@ -101,6 +104,24 @@ export default function Table({
     return columns.map((c) => (c.id === fillColumnId ? { ...c, width: fillWidth, maxWidth: Math.max(fillWidth, c.maxWidth ?? 0) } : c));
   }, [columns, containerWidth, fillColumnId]);
 
+  // Select columns get a multi-value membership filter, driven by the
+  // "Filter by value" checklist in HeaderMenu. Other data types aren't
+  // filterable yet — react-table just leaves `filter` unset for them.
+  const filterableColumns = useMemo(
+    () => effectiveColumns.map((c) => (c.dataType === "select" ? { ...c, filter: "selectMulti" } : c)),
+    [effectiveColumns]
+  );
+
+  const filterTypes = useMemo(
+    () => ({
+      selectMulti(rows: any[], columnIds: string[], filterValue: string[]) {
+        if (!filterValue || filterValue.length === 0) return rows;
+        return rows.filter((row) => columnIds.some((id) => filterValue.includes(row.values[id])));
+      },
+    }),
+    []
+  );
+
   const sortTypes = useMemo(
     () => ({
       alphanumericFalsyLast(rowA: any, rowB: any, columnId: string, desc: boolean) {
@@ -117,7 +138,7 @@ export default function Table({
 
   const { getTableProps, getTableBodyProps, headerGroups, rows, prepareRow, totalColumnsWidth, setSortBy } = useTable(
     {
-      columns: effectiveColumns as any,
+      columns: filterableColumns as any,
       data: data as any,
       defaultColumn: defaultColumn as any,
       // react-table forwards unrecognized top-level options straight onto
@@ -130,7 +151,9 @@ export default function Table({
       autoResetFilters: !skipReset,
       autoResetRowState: !skipReset,
       sortTypes,
+      filterTypes,
     } as any,
+    useFilters,
     useBlockLayout,
     useResizeColumns,
     useSortBy
